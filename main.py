@@ -8,9 +8,17 @@ from db_conn import get_connection
 from pydantic import BaseModel
 from yahoo_service import get_multiple_prices
 from math_logic import calculate_holding_performance, calculate_portfolio_performance
-
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Portfolio Manager API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:5000", "http://localhost:5000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class HoldingCreate(BaseModel):
