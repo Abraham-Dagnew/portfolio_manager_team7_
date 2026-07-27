@@ -23,7 +23,7 @@ def calculate_total_value(quantity: float, current_price: float) -> float:
         float: Total value, rounded to 2 decimal places.
     """
 
-    return round(quantity * current_price, 2)
+    return round(float(quantity) * float(current_price), 2)
 
 
 def calculate_total_cost(quantity: float, purchase_price: float) -> float:
@@ -38,7 +38,7 @@ def calculate_total_cost(quantity: float, purchase_price: float) -> float:
         float: Total cost, rounded to 2 decimal places.
     """
 
-    return round(quantity * purchase_price, 2)
+    return round(float(quantity) * float(purchase_price), 2)
 
 
 def calculate_total_gain(quantity: float, purchase_price: float, current_price: float) -> float:
@@ -71,6 +71,9 @@ def calculate_gain_percent(purchase_price: float, current_price: float) -> float
         float: Percentage gain, rounded to 2 decimal places. Returns 0.0
             if the purchase price is 0 (avoids division by zero).
     """
+
+    purchase_price = float(purchase_price)
+    current_price = float(current_price)
 
     if purchase_price == 0:
         return 0.0
