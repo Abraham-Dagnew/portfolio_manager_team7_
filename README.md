@@ -1,5 +1,13 @@
 # Neueda-Portfolio-Project
 
+## Market Data Integration (Person 2 - Annie)
+
+Integrates live stock market pricing into the application using `yfinance`.
+
+- `yahoo_service.py` — Modules to connect with the Yahoo Finance API and fetch live market quotes.
+- `get_stock_price(ticker)` — Fetches the real-time market price for a given stock symbol.
+- `get_multiple_prices(tickers)` — Efficiently retrieves current market prices for a batch of portfolio tickers simultaneously.
+
 ## Performance Calculations (Person 3)
 
 Combines stored holdings with live Yahoo Finance prices to report portfolio performance.
