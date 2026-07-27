@@ -6,6 +6,8 @@ from fastapi import FastAPI
 import uvicorn
 from db_conn import get_connection
 from pydantic import BaseModel
+from yahoo_service import get_multiple_prices
+from math_logic import calculate_holding_performance, calculate_portfolio_performance
 
 
 app = FastAPI(title="Portfolio Manager API", version="1.0.0")
@@ -98,6 +100,47 @@ def delete_portfolio(holding_id: int):
     conn.close()
     return {"message": f"Holding {holding_id} deleted"}
 
+
+@app.get("/portfolio/performance")
+def get_portfolio_performance():
+    """
+    Returns each holding enriched with live price and performance figures,
+    plus an aggregate summary across the whole portfolio.
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM portfolio")
+    holdings = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    prices = get_multiple_prices([holding["ticker"] for holding in holdings])
+
+    enriched_holdings = []
+    for holding in holdings:
+        current_price = prices.get(holding["ticker"].strip().upper(), 0.0)
+        performance = calculate_holding_performance(
+            quantity=holding["quantity"],
+            purchase_price=holding["purchasePrice"],
+            current_price=current_price,
+        )
+        enriched_holdings.append(
+            {**holding, "currentPrice": current_price, **performance}
+        )
+
+    summary = calculate_portfolio_performance(
+        [
+            {
+                "quantity": holding["quantity"],
+                "purchasePrice": holding["purchasePrice"],
+                "currentPrice": holding["currentPrice"],
+            }
+            for holding in enriched_holdings
+        ]
+    )
+
+    return {"holdings": enriched_holdings, "summary": summary}
 
 
 if __name__ == "__main__":
