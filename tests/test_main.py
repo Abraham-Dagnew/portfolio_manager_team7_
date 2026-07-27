@@ -104,6 +104,31 @@ class PortfolioApiTests(unittest.TestCase):
         self.assertEqual(response, {"message": "Holding added", "id": 7})
         self.assertTrue(fake_connection.committed)
 
+    def test_get_portfolio_performance_returns_holdings_and_summary(self):
+        """
+        Verifies performance endpoint enriches holdings with live prices
+        and returns an aggregate summary.
+        """
+
+        fake_connection = FakeConnection(
+            rows=[
+                {"id": 1, "ticker": "AAPL", "quantity": 10, "purchasePrice": 100.0},
+                {"id": 2, "ticker": "MSFT", "quantity": 5, "purchasePrice": 200.0},
+            ]
+        )
+        fake_prices = {"AAPL": 150.0, "MSFT": 180.0}
+
+        with patch("main.get_connection", return_value=fake_connection), patch(
+            "main.get_multiple_prices", return_value=fake_prices
+        ):
+            response = main.get_portfolio_performance()
+
+        self.assertEqual(len(response["holdings"]), 2)
+        self.assertEqual(response["holdings"][0]["currentPrice"], 150.0)
+        self.assertEqual(response["holdings"][0]["totalGain"], 500.0)
+        self.assertEqual(response["summary"]["totalValue"], 2400.0)
+        self.assertEqual(response["summary"]["totalGain"], 400.0)
+
     def test_delete_portfolio_returns_message(self):
         """
         Verifies deleting a holding returns the confirmation message.
