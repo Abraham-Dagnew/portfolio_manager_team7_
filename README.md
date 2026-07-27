@@ -1,5 +1,16 @@
 # Neueda-Portfolio-Project
 
+## Core API & Database (Person 1)
+
+Provides the CRUD foundation — storing, retrieving, updating, and deleting portfolio holdings in a MySQL database.
+
+- `db_conn.py` — Opens the connection to MySQL and creates the `portfolio` table (columns: `id`, `ticker`, `type`, `quantity`, `purchasePrice`, `purchaseDate`) if it doesn't already exist.
+- `GET /portfolio` (in `main.py`) — Returns every holding currently stored in the database.
+- `POST /portfolio` — Adds a new holding. Expects `ticker`, `type` (stock/bond/cash), `quantity`, `purchasePrice`, and `purchaseDate` (must be `YYYY-MM-DD`) in the request body.
+- `DELETE /portfolio/{id}` — Removes a holding entirely by its id.
+
+`GET`, `POST`, and `DELETE` are covered by `tests/test_main.py`
+
 ## Market Data Integration (Person 2)
 
 Integrates live stock market pricing into the application using `yfinance`.
