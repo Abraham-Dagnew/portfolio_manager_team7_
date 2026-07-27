@@ -1,6 +1,6 @@
 # Neueda-Portfolio-Project
 
-## Market Data Integration (Person 2 - Annie)
+## Market Data Integration (Person 2)
 
 Integrates live stock market pricing into the application using `yfinance`.
 
