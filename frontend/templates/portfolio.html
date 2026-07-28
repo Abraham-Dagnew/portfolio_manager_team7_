@@ -1,8 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}Browse Portfolio{% endblock %}
+{% block title %}Browse Holdings - Portfolio Manager{% endblock %}
 
 {% block content %}
-<h1>Portfolio</h1>
-<p>Coming soon.</p>
+<h2>Your Holdings</h2>
+
+<div id="holdings-container">
+    <p>Loading portfolio...</p>
+</div>
+
+<!-- Update JS link here -->
+<script type="module" src="/static/js/portfolio.js"></script>
 {% endblock %}

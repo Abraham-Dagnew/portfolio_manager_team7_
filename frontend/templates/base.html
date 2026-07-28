@@ -2,17 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Portfolio Manager{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Update CSS link here -->
+    <link rel="stylesheet" href="/static/css/style.css">
     {% block head %}{% endblock %}
 </head>
 <body>
-    <nav class="nav">
-        <a href="{{ url_for('portfolio') }}">Portfolio</a>
-        <a href="{{ url_for('performance') }}">Performance</a>
-        <a href="{{ url_for('add_holding') }}">Add Holding</a>
-    </nav>
-    <main class="content">
+    <header>
+        <nav class="navbar">
+            <h1 class="logo">Portfolio Manager</h1>
+            <ul class="nav-links">
+                <li><a href="/portfolio">Browse Holdings</a></li>
+                <li><a href="/performance">Performance</a></li>
+                <li><a href="/add" class="btn-nav">+ Add Holding</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container">
         {% block content %}{% endblock %}
     </main>
     {% block scripts %}{% endblock %}
