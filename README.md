@@ -1,5 +1,7 @@
 # Neueda-Portfolio-Project
 
+
+
 ## Core API & Database (Person 1)
 
 Provides the CRUD foundation — storing, retrieving, updating, and deleting portfolio holdings in a MySQL database.
@@ -60,3 +62,35 @@ Manually verify against live data:
    ```
 
 You can also try it from the interactive Swagger docs at `http://127.0.0.1:8000/docs`.
+
+## Portfolio Performance UI (Person B)
+
+A Flask frontend that renders the portfolio performance data from `GET /portfolio/performance` in the browser, with summary totals, a gain/loss chart, and a holdings table.
+
+- `frontend/app.py` — Flask app serving the frontend pages (`/`, `/performance`, `/add`).
+- `frontend/templates/performance.html` + `frontend/static/js/performance.js` — fetches live performance data via `frontend/static/js/api.js` and renders summary cards (total value, total cost, total gain, gain %), a Chart.js bar chart of gain/loss per holding, and a holdings table. Handles loading, empty, and error states.
+- `frontend/templates/base.html`, `frontend/static/css/style.css` — shared layout/nav and base styling used across all frontend pages.
+
+### Testing
+
+3. Start the backend:
+   ```powershell
+   python -m uvicorn main:app --host 127.0.0.1 --port 8000
+   ```
+4. In a second terminal, start the frontend:
+   ```powershell
+   cd frontend
+   python app.py
+   ```
+5. Open `http://127.0.0.1:5000/performance` in your browser. With no holdings, you should see an empty-state message.
+6. In a third terminal, add a holding:
+   ```powershell
+   Invoke-RestMethod -Uri http://127.0.0.1:8000/portfolio -Method Post -ContentType "application/json" -Body '{"ticker":"AAPL","type":"stock","quantity":10,"purchasePrice":150.25,"purchaseDate":"2026-01-15"}'
+   ```
+7. Refresh `http://127.0.0.1:5000/performance`. Confirm the summary cards, chart, and table all populate with real data (including a live `currentPrice` from Yahoo Finance), and check the browser console for errors.
+8. Clean up the test holding (use the `id` from step 6):
+   ```powershell
+   Invoke-RestMethod -Uri http://127.0.0.1:8000/portfolio/<id> -Method Delete
+   ```
+
+![portfolio performance](image.png)
