@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Add Holding{% endblock %}
+
+{% block content %}
+
+<h2>Add Holding</h2>
+
+<form id="addHoldingForm">
+
+    <label>Ticker</label>
+    <input type="text" id="ticker" required>
+
+    <br><br>
+
+    <label>Type</label>
+    <select id="type" required>
+        <option value="">Select Type</option>
+        <option value="Stock">Stock</option>
+        <option value="Bond">Bond</option>
+        <option value="Cash">Cash</option>
+        <option value="ETF">ETF</option>
+    </select>
+
+    <br><br>
+
+    <label>Quantity</label>
+    <input type="number" id="quantity" required>
+
+    <br><br>
+
+    <label>Purchase Price</label>
+    <input type="number" id="purchasePrice" step="0.01" required>
+
+    <br><br>
+
+    <label>Purchase Date</label>
+    <input type="date" id="purchaseDate" required>
+
+    <br><br>
+
+    <button type="submit">Add Holding</button>
+
+</form>
+
+<p id="message"></p>
+
+<script type="module" src="/static/js/add_holding.js"></script>
+
+{% endblock %}
