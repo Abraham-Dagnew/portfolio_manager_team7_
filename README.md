@@ -94,4 +94,6 @@ A Flask frontend that renders the portfolio performance data from `GET /portfoli
    ```
 
 ![portfolio performance](image.png)
+
+### Architecture
 <img width="920" height="752" alt="image" src="https://github.com/user-attachments/assets/6476a62d-3eba-4a34-93ce-9dcde800d1c7" />
