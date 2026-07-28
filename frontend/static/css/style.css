@@ -15,9 +15,9 @@ body {
     color: white;
 }
 
-.logo { 
-    margin: 0; 
-    font-size: 1.5rem; 
+.logo {
+    margin: 0;
+    font-size: 1.5rem;
 }
 
 .nav-links {
@@ -61,9 +61,9 @@ th, td {
     border-bottom: 1px solid #ddd;
 }
 
-th { 
-    background-color: #f8f9fa; 
-    font-weight: 600; 
+th {
+    background-color: #f8f9fa;
+    font-weight: 600;
 }
 
 .empty-state {
@@ -72,4 +72,71 @@ th {
     background: white;
     border-radius: 8px;
     color: #666;
+}
+
+/* Performance page (Person B) */
+
+.hidden {
+    display: none;
+}
+
+.error {
+    color: #c62828;
+}
+
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.card-label {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.card-value {
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.gain-positive {
+    color: #2e7d32;
+}
+
+.gain-negative {
+    color: #c62828;
+}
+
+.chart-section {
+    max-width: 600px;
+    margin: 2rem 0;
+}
+
+.holdings-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+}
+
+.holdings-table th,
+.holdings-table td {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid #eee;
+}
+
+.holdings-table th {
+    background: #f0f0f0;
 }
