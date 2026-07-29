@@ -29,7 +29,9 @@
         <div class="app-main">
             <header class="topbar">
                 <span class="topbar-brand">PortfolioTracker</span>
-                <input class="topbar-search" type="text" placeholder="Search holdings...">
+                {% if active_page == 'portfolio' %}
+                <input class="topbar-search" type="text" placeholder="Search by ticker...">
+                {% endif %}
             </header>
 
             <main class="container">
