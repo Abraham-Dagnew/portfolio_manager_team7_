@@ -54,6 +54,13 @@ class HoldingCreate(BaseModel):
             raise ValueError("Ticker must be 1-5 alphabetic characters")
         return v
 
+    @field_validator("type", mode="before")
+    @classmethod
+    def normalize_type(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
 
 @app.get("/")
 def root():
