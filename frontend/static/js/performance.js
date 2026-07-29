@@ -5,6 +5,9 @@ const errorEl = document.getElementById("performance-error");
 const emptyEl = document.getElementById("performance-empty");
 const contentEl = document.getElementById("performance-content");
 const tableBodyEl = document.getElementById("holdings-table-body");
+const lastUpdatedEl = document.getElementById("last-updated");
+
+const ALLOCATION_COLORS = ["#7c3aed", "#4f46e5", "#16a34a", "#f59e0b", "#dc2626", "#0ea5e9", "#db2777"];
 
 function formatCurrency(value) {
     return `$${Number(value).toFixed(2)}`;
@@ -12,6 +15,10 @@ function formatCurrency(value) {
 
 function formatPercent(value) {
     return `${Number(value).toFixed(2)}%`;
+}
+
+function renderLastUpdated() {
+    lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
 }
 
 function renderSummary(summary) {
@@ -47,8 +54,8 @@ function renderTable(holdings) {
     }
 }
 
-function renderChart(holdings) {
-    const ctx = document.getElementById("performance-chart");
+function renderGainLossChart(holdings) {
+    const ctx = document.getElementById("gain-loss-chart");
 
     new Chart(ctx, {
         type: "bar",
@@ -59,7 +66,7 @@ function renderChart(holdings) {
                     label: "Total Gain ($)",
                     data: holdings.map((holding) => holding.totalGain),
                     backgroundColor: holdings.map((holding) =>
-                        holding.totalGain >= 0 ? "#2e7d32" : "#c62828"
+                        holding.totalGain >= 0 ? "#16a34a" : "#dc2626"
                     ),
                 },
             ],
@@ -68,7 +75,29 @@ function renderChart(holdings) {
             responsive: true,
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: "Gain / Loss by Holding" },
+            },
+        },
+    });
+}
+
+function renderAllocationChart(holdings) {
+    const ctx = document.getElementById("allocation-chart");
+
+    new Chart(ctx, {
+        type: "doughnut",
+        data: {
+            labels: holdings.map((holding) => holding.ticker),
+            datasets: [
+                {
+                    data: holdings.map((holding) => holding.totalValue),
+                    backgroundColor: holdings.map((_, index) => ALLOCATION_COLORS[index % ALLOCATION_COLORS.length]),
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: "bottom" },
             },
         },
     });
@@ -84,9 +113,11 @@ async function loadPerformance() {
             return;
         }
 
+        renderLastUpdated();
         renderSummary(data.summary);
         renderTable(data.holdings);
-        renderChart(data.holdings);
+        renderGainLossChart(data.holdings);
+        renderAllocationChart(data.holdings);
         contentEl.classList.remove("hidden");
     } catch (error) {
         loadingEl.classList.add("hidden");
