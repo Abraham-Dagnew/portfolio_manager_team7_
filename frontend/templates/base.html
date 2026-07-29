@@ -9,20 +9,36 @@
     {% block head %}{% endblock %}
 </head>
 <body>
-    <header>
-        <nav class="navbar">
-            <h1 class="logo">Portfolio Manager</h1>
-            <ul class="nav-links">
-                <li><a href="/portfolio">Browse Holdings</a></li>
-                <li><a href="/performance">Performance</a></li>
-                <li><a href="/add" class="btn-nav">+ Add Holding</a></li>
-            </ul>
-        </nav>
-    </header>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">P</div>
+                <div>
+                    <div class="brand-title">Portfolio</div>
+                    <div class="brand-subtitle">Investment Dashboard</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">Main</div>
+                <a href="/portfolio" class="nav-item {% if active_page == 'portfolio' %}active{% endif %}">Browse Holdings</a>
+                <a href="/performance" class="nav-item {% if active_page == 'performance' %}active{% endif %}">Performance</a>
+                <a href="/add" class="nav-item {% if active_page == 'add' %}active{% endif %}">+ Add Holding</a>
+            </nav>
+        </aside>
 
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+        <div class="app-main">
+            <header class="topbar">
+                <span class="topbar-brand">PortfolioTracker</span>
+                {% if active_page == 'portfolio' %}
+                <input class="topbar-search" type="text" placeholder="Search by ticker...">
+                {% endif %}
+            </header>
+
+            <main class="container">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
     {% block scripts %}{% endblock %}
 </body>
 </html>

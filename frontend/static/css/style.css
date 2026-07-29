@@ -1,56 +1,155 @@
+:root {
+    --purple: #7c3aed;
+    --blue: #4f46e5;
+    --bg: #f8f9fb;
+    --border: #e5e7eb;
+    --text: #111827;
+    --text-muted: #6b7280;
+    --green: #16a34a;
+    --red: #dc2626;
+    --card-radius: 12px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
     padding: 0;
-    background-color: #f4f6f8;
-    color: #333;
+    background-color: var(--bg);
+    color: var(--text);
 }
 
-.navbar {
+/* App shell: sidebar + main content */
+
+.app-shell {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #1a252f;
-    padding: 1rem 2rem;
-    color: white;
+    min-height: 100vh;
 }
 
-.logo {
-    margin: 0;
-    font-size: 1.5rem;
+.sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: #fff;
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 1rem;
 }
 
-.nav-links {
-    list-style: none;
+.sidebar-brand {
     display: flex;
-    gap: 1.5rem;
     align-items: center;
-    margin: 0;
+    gap: 0.75rem;
+    padding: 0 0.5rem 1.5rem;
 }
 
-.nav-links a {
-    color: #ecf0f1;
+.brand-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--purple), var(--blue));
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.brand-title {
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.brand-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.nav-section-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.nav-item {
+    display: block;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    color: var(--text);
     text-decoration: none;
     font-weight: 500;
+    margin-bottom: 0.25rem;
 }
 
-.btn-nav {
-    background-color: #27ae60;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+.nav-item:hover {
+    background: var(--bg);
+}
+
+.nav-item.active {
+    background: linear-gradient(135deg, var(--purple), var(--blue));
+    color: #fff;
+}
+
+.app-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+}
+
+.topbar-brand {
+    font-weight: 700;
+}
+
+.topbar-search {
+    flex: 1;
+    max-width: 360px;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
 }
 
 .container {
-    max-width: 1000px;
-    margin: 2rem auto;
-    padding: 0 1rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem;
 }
+
+/* Page heading */
+
+.page-heading {
+    margin-bottom: 1.5rem;
+}
+
+.page-heading h1 {
+    margin: 0 0 0.25rem;
+    font-size: 1.75rem;
+}
+
+.page-heading p {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+/* Generic table (Browse Holdings) */
 
 table {
     width: 100%;
     border-collapse: collapse;
     background: white;
-    border-radius: 8px;
+    border-radius: var(--card-radius);
     overflow: hidden;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
@@ -70,8 +169,8 @@ th {
     text-align: center;
     padding: 3rem;
     background: white;
-    border-radius: 8px;
-    color: #666;
+    border-radius: var(--card-radius);
+    color: var(--text-muted);
 }
 
 /* Performance page (Person B) */
@@ -81,53 +180,116 @@ th {
 }
 
 .error {
-    color: #c62828;
+    color: var(--red);
+}
+
+.last-updated {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: right;
+    margin-bottom: 1rem;
 }
 
 .summary-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
-    margin: 1.5rem 0;
+    margin-bottom: 1.5rem;
 }
 
 .card {
     background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--card-radius);
+    padding: 1.25rem;
+    position: relative;
 }
 
 .card-label {
     font-size: 0.85rem;
-    color: #666;
+    color: var(--text-muted);
+}
+
+.card-icon {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
 }
 
 .card-value {
-    font-size: 1.4rem;
-    font-weight: 600;
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 0.5rem;
 }
 
 .gain-positive {
-    color: #2e7d32;
+    color: var(--green);
 }
 
 .gain-negative {
-    color: #c62828;
+    color: var(--red);
 }
 
-.chart-section {
-    max-width: 600px;
-    margin: 2rem 0;
+.analytics-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 800px) {
+    .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+    .app-shell {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+}
+
+.chart-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--card-radius);
+    padding: 1.25rem;
+}
+
+.chart-card h2 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+}
+
+.table-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--card-radius);
+    padding: 1.25rem;
+}
+
+.table-card h2 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
 }
 
 .holdings-table {
     width: 100%;
     border-collapse: collapse;
     background: #fff;
+    box-shadow: none;
+    border-radius: 0;
 }
 
 .holdings-table th,
@@ -138,5 +300,9 @@ th {
 }
 
 .holdings-table th {
-    background: #f0f0f0;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }

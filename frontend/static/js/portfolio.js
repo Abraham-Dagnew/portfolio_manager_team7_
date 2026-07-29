@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         holdings.forEach(item => {
             html += `
-                <tr>
+                <tr data-ticker="${item.ticker.toLowerCase()}">
                     <td><strong>${item.ticker}</strong></td>
                     <td>${item.type}</td>
                     <td>${item.quantity}</td>
@@ -64,6 +64,18 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
             });
         });
+
+        // Wire up the top bar search to filter holdings by ticker
+        const searchInput = document.querySelector(".topbar-search");
+        if (searchInput) {
+            searchInput.addEventListener("input", () => {
+                const query = searchInput.value.trim().toLowerCase();
+                document.querySelectorAll("#holdings-container tbody tr").forEach((row) => {
+                    const matches = row.dataset.ticker.includes(query);
+                    row.style.display = matches ? "" : "none";
+                });
+            });
+        }
 
     } catch (error) {
         container.innerHTML = `<p style="color: red;">Error loading portfolio: ${error.message}</p>`;
