@@ -256,6 +256,49 @@ class PortfolioApiTests(unittest.TestCase):
         self.assertEqual(response, {"message": "Deposited $500.00", "cash": 1500.0})
         self.assertTrue(fake_connection.committed)
 
+    def test_withdraw_funds_subtracts_from_balance(self):
+        """
+        Verifies a withdrawal decreases the cash balance by the given amount.
+        """
+
+        fake_connection = FakeConnection(fetchone_results=[{"cash": 1000.0}])
+
+        with patch("main.get_connection", return_value=fake_connection):
+            response = main.withdraw_funds(main.WithdrawRequest(amount=500.0))
+
+        self.assertEqual(response, {"message": "Withdrew $500.00", "cash": 500.0})
+        self.assertTrue(fake_connection.committed)
+
+    def test_withdraw_funds_rejects_amount_exceeding_balance(self):
+        """
+        Verifies a withdrawal larger than the balance is rejected with a
+        clear 400 and the balance is left unchanged.
+        """
+
+        fake_connection = FakeConnection(fetchone_results=[{"cash": 100.0}])
+
+        with patch("main.get_connection", return_value=fake_connection):
+            with self.assertRaises(HTTPException) as ctx:
+                main.withdraw_funds(main.WithdrawRequest(amount=500.0))
+
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("Cannot withdraw", ctx.exception.detail)
+        self.assertFalse(fake_connection.committed)
+        self.assertTrue(fake_connection.rolled_back)
+
+    def test_withdraw_funds_allows_exact_balance(self):
+        """
+        Verifies withdrawing exactly the full balance is allowed and
+        leaves the balance at zero, not negative.
+        """
+
+        fake_connection = FakeConnection(fetchone_results=[{"cash": 250.0}])
+
+        with patch("main.get_connection", return_value=fake_connection):
+            response = main.withdraw_funds(main.WithdrawRequest(amount=250.0))
+
+        self.assertEqual(response, {"message": "Withdrew $250.00", "cash": 0.0})
+
 
 if __name__ == "__main__":
     unittest.main()

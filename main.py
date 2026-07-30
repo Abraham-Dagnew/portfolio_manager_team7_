@@ -68,6 +68,14 @@ class DepositRequest(BaseModel):
     amount: float = Field(..., gt=0, description="Deposit amount must be greater than zero")
 
 
+class WithdrawRequest(BaseModel):
+    """
+    Request body for removing funds from the cash balance.
+    """
+
+    amount: float = Field(..., gt=0, description="Withdrawal amount must be greater than zero")
+
+
 def get_current_balance(cursor) -> float:
     """
     Reads the single-row cash balance. Raises a 500 with a clear message
@@ -186,6 +194,42 @@ def deposit_funds(deposit: DepositRequest):
         conn.close()
 
     return {"message": f"Deposited ${deposit.amount:.2f}", "cash": new_balance}
+
+
+@app.post("/balance/withdraw")
+def withdraw_funds(withdrawal: WithdrawRequest):
+    """
+    Removes funds from the cash balance. Rejected if it would take the
+    balance below zero.
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        current_balance = get_current_balance(cursor)
+        if withdrawal.amount > current_balance:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot withdraw ${withdrawal.amount:.2f}: your balance is only "
+                    f"${current_balance:.2f}."
+                ),
+            )
+
+        new_balance = round(current_balance - withdrawal.amount, 2)
+        cursor.execute("UPDATE balance SET cash = %s WHERE id = 1", (new_balance,))
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
+    return {"message": f"Withdrew ${withdrawal.amount:.2f}", "cash": new_balance}
 
 
 @app.post("/portfolio")

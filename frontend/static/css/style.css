@@ -137,15 +137,21 @@ body {
 }
 
 .deposit-form button {
-    padding: 0.4rem 0.6rem;
+    width: 30px;
+    padding: 0.4rem 0;
     border: none;
     border-radius: 6px;
     background: linear-gradient(135deg, var(--purple), var(--blue));
     color: #fff;
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 700;
     cursor: pointer;
     white-space: nowrap;
+    flex-shrink: 0;
+}
+
+#withdrawSubmit {
+    background: var(--text-muted);
 }
 
 .deposit-form button:disabled {
