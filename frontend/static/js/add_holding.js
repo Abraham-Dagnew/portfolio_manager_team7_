@@ -11,7 +11,6 @@ form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     // Collect form values and create the holding object
-    // This object matches the FastAPI HoldingCreate model
     const holding = {
         ticker: document.getElementById("ticker").value.trim().toUpperCase(),
         type: document.getElementById("type").value,
@@ -20,18 +19,19 @@ form.addEventListener("submit", async (event) => {
         purchaseDate: document.getElementById("purchaseDate").value
     };
 
-    // Client-side validation:
-    // Checks that required fields are filled and numeric values are valid
-    // before sending data to the backend
-    if (
-        !holding.ticker ||
-        !holding.type ||
-        holding.quantity <= 0 ||
-        holding.purchasePrice <= 0 ||
-        !holding.purchaseDate
-    ) {
+    // Specific validation checks for Quantity and Price
+    const errors = [];
+    if (isNaN(holding.quantity) || holding.quantity <= 0) {
+        errors.push("Quantity must be a number greater than 0.");
+    }
+    if (isNaN(holding.purchasePrice) || holding.purchasePrice <= 0) {
+        errors.push("Purchase price must be a number greater than 0.");
+    }
+
+    // Display field-specific errors if quantity or price are invalid
+    if (errors.length > 0) {
         message.style.color = "red";
-        message.textContent = "Please fill in all fields correctly.";
+        message.innerHTML = errors.map(err => `• ${err}`).join("<br>");
         return;
     }
 
@@ -41,16 +41,12 @@ form.addEventListener("submit", async (event) => {
 
         // Display success message returned from the backend
         message.style.color = "green";
-        message.textContent = response.message;
+        message.textContent = response.message || "Holding added successfully!";
 
         // Clear the form after a successful submission
         form.reset();
 
     } catch (error) {
-        // Handles API/network errors such as:
-        // - FastAPI server not running
-        // - Database failure
-        // - Backend returning an error response
         message.style.color = "red";
         message.textContent = "Error adding holding: " + error.message;
     }

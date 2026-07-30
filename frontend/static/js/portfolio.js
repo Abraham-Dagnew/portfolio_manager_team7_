@@ -8,49 +8,49 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (!holdings || holdings.length === 0) {
             container.innerHTML = `
-                <div class="empty-state">
+                <div class="empty-state card p-4 text-center">
                     <h3>No holdings found</h3>
-                    <p>Click "+ Add Holding" above to start building your portfolio.</p>
+                    <p class="text-muted mb-0">Click "+ Add Holding" to start building your portfolio.</p>
                 </div>
             `;
             return;
         }
 
-        // Build the table layout
         let html = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Ticker</th>
-                        <th>Type</th>
-                        <th>Quantity</th>
-                        <th>Purchase Price</th>
-                        <th>Purchase Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div class="card shadow-sm border-0">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Type</th>
+                                <th>Quantity</th>
+                                <th>Purchase Price</th>
+                                <th>Purchase Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
         `;
 
         holdings.forEach(item => {
             html += `
-                <tr data-ticker="${item.ticker.toLowerCase()}">
+                <tr>
                     <td><strong>${item.ticker}</strong></td>
-                    <td>${item.type}</td>
+                    <td><span class="badge bg-light text-dark text-capitalize">${item.type}</span></td>
                     <td>${item.quantity}</td>
                     <td>$${Number(item.purchasePrice).toFixed(2)}</td>
                     <td>${item.purchaseDate}</td>
                     <td>
-                        <button class="delete-btn" data-id="${item.id}" style="color:red; cursor:pointer;">Delete</button>
+                        <button class="delete-btn btn btn-sm btn-outline-danger" data-id="${item.id}">Delete</button>
                     </td>
                 </tr>
             `;
         });
 
-        html += `</tbody></table>`;
+        html += `</tbody></table></div></div>`;
         container.innerHTML = html;
 
-        // Attach event listeners to the delete buttons (Person C integration)
         document.querySelectorAll(".delete-btn").forEach(button => {
             button.addEventListener("click", async (e) => {
                 const id = e.target.getAttribute("data-id");
@@ -65,19 +65,14 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         });
 
-        // Wire up the top bar search to filter holdings by ticker
-        const searchInput = document.querySelector(".topbar-search");
-        if (searchInput) {
-            searchInput.addEventListener("input", () => {
-                const query = searchInput.value.trim().toLowerCase();
-                document.querySelectorAll("#holdings-container tbody tr").forEach((row) => {
-                    const matches = row.dataset.ticker.includes(query);
-                    row.style.display = matches ? "" : "none";
-                });
-            });
-        }
-
     } catch (error) {
-        container.innerHTML = `<p style="color: red;">Error loading portfolio: ${error.message}</p>`;
+        console.error("Error loading portfolio:", error);
+        
+        container.innerHTML = `
+            <div class="alert alert-danger shadow-sm border-0 p-4" role="alert">
+                <h5 class="alert-heading mb-2">Unable to Load Portfolio</h5>
+                <p class="mb-0">Could not retrieve holdings from backend (${error.message || 'Network error'}). Please make sure the FastAPI backend is running at <code>http://127.0.0.1:8000</code> and try refreshing.</p>
+            </div>
+        `;
     }
 });

@@ -2,10 +2,12 @@
 FastAPI application for the portfolio manager backend.
 """
 
+from enum import Enum
+from datetime import date
 from fastapi import FastAPI
 import uvicorn
 from db_conn import get_connection
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from yahoo_service import get_multiple_prices
 from math_logic import calculate_holding_performance, calculate_portfolio_performance
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,16 +23,43 @@ app.add_middleware(
 )
 
 
+class AssetType(str, Enum):
+    """
+    Allowed asset types for portfolio holdings.
+    """
+    STOCK = "stock"
+    BOND = "bond"
+    CASH = "cash"
+
+
 class HoldingCreate(BaseModel):
     """
-    Request body for creating a new portfolio holding.
+    Request body for creating a new portfolio holding with validation.
     """
 
     ticker: str
-    type: str
-    quantity: float
-    purchasePrice: float
-    purchaseDate: str
+    type: AssetType
+    quantity: float = Field(..., gt=0, description="Quantity must be greater than zero")
+    purchasePrice: float = Field(..., gt=0, description="Purchase price must be greater than zero")
+    purchaseDate: date
+
+    @field_validator("ticker")
+    @classmethod
+    def validate_ticker(cls, v: str) -> str:
+        """
+        Validates ticker is 1-5 alphabetic characters and formats to uppercase.
+        """
+        v = v.strip().upper()
+        if not v.isalpha() or not (1 <= len(v) <= 5):
+            raise ValueError("Ticker must be 1-5 alphabetic characters")
+        return v
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def normalize_type(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
 
 
 @app.get("/")
@@ -81,10 +110,10 @@ def post_portfolio(holding: HoldingCreate):
     """,
         (
             holding.ticker,
-            holding.type,
+            holding.type.value,
             holding.quantity,
             holding.purchasePrice,
-            holding.purchaseDate,
+            holding.purchaseDate.strftime("%Y-%m-%d"),
         ),
     )
     conn.commit()
