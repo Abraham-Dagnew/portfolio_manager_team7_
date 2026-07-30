@@ -4,3 +4,5 @@ python-dotenv
 mysql-connector-python
 pydantic
 httpx
+flask
+yfinance

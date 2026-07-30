@@ -4,11 +4,11 @@ FastAPI application for the portfolio manager backend.
 
 from enum import Enum
 from datetime import date
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 import uvicorn
 from db_conn import get_connection
 from pydantic import BaseModel, Field, field_validator
-from yahoo_service import get_multiple_prices
+from yahoo_service import get_multiple_prices, get_stock_price, search_symbols
 from math_logic import calculate_holding_performance, calculate_portfolio_performance
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -24,10 +24,8 @@ app.add_middleware(
 
 
 class AssetType(str, Enum):
-    """
-    Allowed asset types for portfolio holdings.
-    """
     STOCK = "stock"
+    ETF = "etf"
     BOND = "bond"
     CASH = "cash"
 
@@ -95,11 +93,52 @@ def health_check():
     return {"status": "ok"}
 
 
+@app.get("/stocks/search")
+def search_stocks(q: str = Query(..., min_length=1, description="Ticker or company name to search for")):
+    """
+    Searches for real tickers matching a partial ticker or company name.
+    Covers both stocks and bonds so bond holdings aren't invisible to the
+    Add Holding autocomplete.
+    """
+
+    return search_symbols(q)
+
+
+@app.get("/stocks/price/{ticker}")
+def get_price(ticker: str):
+    """
+    Looks up the live price for a single ticker. Used by the Add Holding
+    form both to verify a ticker is real and to pre-fill the purchase
+    price field for the user.
+    """
+
+    clean_ticker = ticker.strip().upper()
+    price = get_stock_price(clean_ticker)
+
+    if price <= 0.0:
+        raise HTTPException(
+            status_code=404,
+            detail=f"'{clean_ticker}' doesn't look like a valid, tradeable ticker. Please double-check it.",
+        )
+
+    return {"ticker": clean_ticker, "price": price}
+
+
 @app.post("/portfolio")
 def post_portfolio(holding: HoldingCreate):
     """
-    Inserts a new holding into the portfolio table.
+    Inserts a new holding into the portfolio table. Rejects the request
+    if the ticker doesn't resolve to a real, tradeable price (cash
+    positions are exempt since they aren't backed by a market ticker).
     """
+
+    if holding.type != AssetType.CASH:
+        price = get_stock_price(holding.ticker)
+        if price <= 0.0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{holding.ticker}' doesn't look like a valid, tradeable ticker. Please double-check it.",
+            )
 
     conn = get_connection()
     cursor = conn.cursor()
