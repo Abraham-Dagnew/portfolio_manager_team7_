@@ -1,6 +1,7 @@
 // Import the shared API functions
 import { addHolding, searchStocks, getStockPrice } from "./api.js";
 import { showToast } from "./toast.js";
+import { refreshBalance } from "./balance.js";
 
 // Get references to the form and message display area
 const form = document.getElementById("addHoldingForm");
@@ -339,7 +340,7 @@ form.addEventListener("submit", async (event) => {
             "success"
         );
 
-
+        refreshBalance();
 
         form.reset();
 

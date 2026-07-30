@@ -60,6 +60,30 @@ class HoldingCreate(BaseModel):
         return v
 
 
+class DepositRequest(BaseModel):
+    """
+    Request body for adding funds to the cash balance.
+    """
+
+    amount: float = Field(..., gt=0, description="Deposit amount must be greater than zero")
+
+
+def get_current_balance(cursor) -> float:
+    """
+    Reads the single-row cash balance. Raises a 500 with a clear message
+    if the balance table hasn't been seeded yet (db_conn.py wasn't run).
+    """
+
+    cursor.execute("SELECT cash FROM balance WHERE id = 1")
+    row = cursor.fetchone()
+    if row is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Balance not initialized. Run 'python db_conn.py' to set up the balance table.",
+        )
+    return float(row["cash"])
+
+
 @app.get("/")
 def root():
     """
@@ -124,12 +148,54 @@ def get_price(ticker: str):
     return {"ticker": clean_ticker, "price": price}
 
 
+@app.get("/balance")
+def get_balance():
+    """
+    Returns the current cash balance available to spend on new holdings.
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cash = get_current_balance(cursor)
+    finally:
+        cursor.close()
+        conn.close()
+    return {"cash": cash}
+
+
+@app.post("/balance/deposit")
+def deposit_funds(deposit: DepositRequest):
+    """
+    Adds funds to the cash balance. This is the only way the balance
+    increases, since the app has no income/paycheck modeling.
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        current_balance = get_current_balance(cursor)
+        new_balance = round(current_balance + deposit.amount, 2)
+        cursor.execute("UPDATE balance SET cash = %s WHERE id = 1", (new_balance,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
+    return {"message": f"Deposited ${deposit.amount:.2f}", "cash": new_balance}
+
+
 @app.post("/portfolio")
 def post_portfolio(holding: HoldingCreate):
     """
     Inserts a new holding into the portfolio table. Rejects the request
     if the ticker doesn't resolve to a real, tradeable price (cash
-    positions are exempt since they aren't backed by a market ticker).
+    positions are exempt since they aren't backed by a market ticker),
+    or if the purchase would exceed the available cash balance. On
+    success, the purchase cost is deducted from the balance.
     """
 
     if holding.type != AssetType.CASH:
@@ -140,41 +206,100 @@ def post_portfolio(holding: HoldingCreate):
                 detail=f"'{holding.ticker}' doesn't look like a valid, tradeable ticker. Please double-check it.",
             )
 
+    cost = round(holding.quantity * holding.purchasePrice, 2)
+
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO portfolio (ticker, type, quantity, purchasePrice, purchaseDate)
-        VALUES (%s, %s, %s, %s, %s)
-    """,
-        (
-            holding.ticker,
-            holding.type.value,
-            holding.quantity,
-            holding.purchasePrice,
-            holding.purchaseDate.strftime("%Y-%m-%d"),
-        ),
-    )
-    conn.commit()
-    new_id = cursor.lastrowid
-    cursor.close()
-    conn.close()
-    return {"message": "Holding added", "id": new_id}
+    cursor = conn.cursor(dictionary=True)
+    try:
+        current_balance = get_current_balance(cursor)
+        if cost > current_balance:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Insufficient funds: this purchase costs ${cost:.2f} "
+                    f"but you only have ${current_balance:.2f} available."
+                ),
+            )
+
+        cursor.execute(
+            """
+            INSERT INTO portfolio (ticker, type, quantity, purchasePrice, purchaseDate)
+            VALUES (%s, %s, %s, %s, %s)
+        """,
+            (
+                holding.ticker,
+                holding.type.value,
+                holding.quantity,
+                holding.purchasePrice,
+                holding.purchaseDate.strftime("%Y-%m-%d"),
+            ),
+        )
+        new_id = cursor.lastrowid
+
+        new_balance = round(current_balance - cost, 2)
+        cursor.execute("UPDATE balance SET cash = %s WHERE id = 1", (new_balance,))
+
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
+    return {"message": "Holding added", "id": new_id, "remainingBalance": new_balance}
 
 
 @app.delete("/portfolio/{holding_id}")
 def delete_portfolio(holding_id: int):
     """
-    Deletes a holding from the portfolio table by id.
+    Deletes a holding from the portfolio table by id and refunds its
+    original cost basis (quantity * purchasePrice) back to the cash
+    balance, since there's no separate "sell" action yet - deleting a
+    holding is treated as undoing the purchase.
     """
 
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM portfolio WHERE id = %s", (holding_id,))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    return {"message": f"Holding {holding_id} deleted"}
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT quantity, purchasePrice FROM portfolio WHERE id = %s",
+            (holding_id,),
+        )
+        holding = cursor.fetchone()
+        if holding is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No holding found with id {holding_id}.",
+            )
+
+        refund = round(float(holding["quantity"]) * float(holding["purchasePrice"]), 2)
+
+        cursor.execute("DELETE FROM portfolio WHERE id = %s", (holding_id,))
+
+        current_balance = get_current_balance(cursor)
+        new_balance = round(current_balance + refund, 2)
+        cursor.execute("UPDATE balance SET cash = %s WHERE id = 1", (new_balance,))
+
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
+    return {
+        "message": f"Holding {holding_id} deleted",
+        "refunded": refund,
+        "remainingBalance": new_balance,
+    }
 
 
 @app.get("/portfolio/performance")

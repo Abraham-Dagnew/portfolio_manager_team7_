@@ -1,5 +1,6 @@
 import { getPortfolio, deleteHolding } from './api.js';
 import { showToast } from './toast.js';
+import { refreshBalance } from './balance.js';
 
 document.addEventListener("DOMContentLoaded", async () => {
 
@@ -140,6 +141,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                             "Holding deleted successfully",
                             "success"
                         );
+
+                        refreshBalance();
 
 
                         const remaining =

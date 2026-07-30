@@ -77,7 +77,42 @@ def update_existing_table():
     print("Portfolio table updated successfully!")
 
 
+STARTING_BALANCE = 10000.00
+
+
+def create_balance_table():
+    """
+    Creates the single-row `balance` table if it doesn't already exist,
+    and seeds it with a starting cash balance. This app has no user
+    accounts, so there is exactly one balance row (id=1) for the whole
+    portfolio.
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS balance (
+            id INT PRIMARY KEY,
+            cash DECIMAL(12,2) NOT NULL
+        )
+    """)
+
+    cursor.execute(
+        "INSERT IGNORE INTO balance (id, cash) VALUES (1, %s)",
+        (STARTING_BALANCE,),
+    )
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    print("Balance table ready.")
+
+
 if __name__ == "__main__":
 
     create_table()
+    create_balance_table()
 
