@@ -79,6 +79,45 @@ export async function searchStocks(query) {
     return await response.json();
 }
 
+// GET /balance
+export async function getBalance() {
+    const response = await fetch(`${API_BASE_URL}/balance`);
+    if (!response.ok) {
+        throw new Error(await extractErrorMessage(response, "Failed to fetch balance"));
+    }
+    return await response.json();
+}
+
+// POST /balance/deposit
+export async function depositFunds(amount) {
+    const response = await fetch(`${API_BASE_URL}/balance/deposit`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ amount })
+    });
+    if (!response.ok) {
+        throw new Error(await extractErrorMessage(response, "Failed to deposit funds"));
+    }
+    return await response.json();
+}
+
+// POST /balance/withdraw
+export async function withdrawFunds(amount) {
+    const response = await fetch(`${API_BASE_URL}/balance/withdraw`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ amount })
+    });
+    if (!response.ok) {
+        throw new Error(await extractErrorMessage(response, "Failed to withdraw funds"));
+    }
+    return await response.json();
+}
+
 // GET /stocks/price/{ticker} (Person C)
 // Confirms a ticker actually exists and returns its live price so the
 // Add Holding form can reject bad tickers and pre-fill purchase price.

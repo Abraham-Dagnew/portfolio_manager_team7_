@@ -24,6 +24,17 @@
                 <a href="/performance" class="nav-item {% if active_page == 'performance' %}active{% endif %}">Performance</a>
                 <a href="/add" class="nav-item {% if active_page == 'add' %}active{% endif %}">+ Add Holding</a>
             </nav>
+
+            <div class="balance-widget">
+                <div class="balance-label">Cash Balance</div>
+                <div class="balance-amount" id="balance-amount">Loading&hellip;</div>
+                <div class="balance-error" id="balance-error"></div>
+                <form id="depositForm" class="deposit-form">
+                    <input type="number" id="fundsAmount" min="0.01" step="0.01" placeholder="Amount">
+                    <button type="submit" id="depositSubmit" title="Add funds">+</button>
+                    <button type="button" id="withdrawSubmit" title="Withdraw funds">&minus;</button>
+                </form>
+            </div>
         </aside>
 
         <div class="app-main">
@@ -39,6 +50,7 @@
             </main>
         </div>
     </div>
+    <script type="module" src="/static/js/balance.js"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

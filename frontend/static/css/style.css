@@ -94,6 +94,71 @@ body {
     color: #fff;
 }
 
+.balance-widget {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--card-radius);
+    background: var(--bg);
+}
+
+.balance-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.balance-amount {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0.25rem 0 0.75rem;
+}
+
+.balance-error {
+    font-size: 0.75rem;
+    color: var(--red);
+    min-height: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.deposit-form {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.deposit-form input {
+    width: 0;
+    flex: 1;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.deposit-form button {
+    width: 30px;
+    padding: 0.4rem 0;
+    border: none;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--purple), var(--blue));
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+#withdrawSubmit {
+    background: var(--text-muted);
+}
+
+.deposit-form button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .app-main {
     flex: 1;
     min-width: 0;
