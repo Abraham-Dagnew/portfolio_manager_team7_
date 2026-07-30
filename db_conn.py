@@ -9,9 +9,8 @@ def get_connection():
     """
     Opens a new connection to the MySQL database using credentials
     from the .env file.
-
-
     """
+
     return mysql.connector.connect(
         host=os.getenv("DB_HOST"),
         port=int(os.getenv("DB_PORT")),
@@ -27,30 +26,58 @@ def create_table():
 
     Table columns:
         id (INT): Auto-incrementing primary key.
-        ticker (VARCHAR(10)): Stock/bond symbol, e.g. "AAPL".
-        type (ENUM): One of 'stock', 'bond', 'cash'.
-        quantity (DECIMAL(10,4)): Number of units held.
-        purchasePrice (DECIMAL(10,2)): Price per unit at time of purchase.
-        purchaseDate (DATE): Date the asset was acquired.
-
+        ticker (VARCHAR(10)): Asset symbol, e.g. "AAPL", "SOXL".
+        type (ENUM): One of 'stock', 'etf', 'bond', 'cash'.
+        quantity (DECIMAL): Number of units held.
+        purchasePrice (DECIMAL): Price per unit at purchase.
+        purchaseDate (DATE): Date asset was acquired.
     """
+
     conn = get_connection()
     cursor = conn.cursor()
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS portfolio (
             id INT AUTO_INCREMENT PRIMARY KEY,
             ticker VARCHAR(10) NOT NULL,
-            type ENUM('stock', 'bond', 'cash') NOT NULL,
+            type ENUM('stock', 'etf', 'bond', 'cash') NOT NULL,
             quantity DECIMAL(10,4) NOT NULL,
             purchasePrice DECIMAL(10,2) NOT NULL,
             purchaseDate DATE NOT NULL
         )
     """)
+
     conn.commit()
+
     cursor.close()
     conn.close()
-    print("Table created successfully!")
+
+    print("Portfolio table created successfully!")
+
+
+def update_existing_table():
+    """
+    Updates an existing portfolio table to support ETF holdings.
+    Run this once if the table already exists.
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        ALTER TABLE portfolio
+        MODIFY type ENUM('stock', 'etf', 'bond', 'cash') NOT NULL
+    """)
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    print("Portfolio table updated successfully!")
 
 
 if __name__ == "__main__":
+
     create_table()
+
