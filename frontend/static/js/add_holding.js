@@ -14,6 +14,7 @@ const purchasePriceInput = document.getElementById("purchasePrice");
 const purchaseDateInput = document.getElementById("purchaseDate");
 const stockSuggestions = document.getElementById("stockSuggestions");
 const purchasePriceHint = document.getElementById("purchasePriceHint");
+const totalCostInput = document.getElementById("total-cost");
 
 
 let searchTimer;
@@ -68,6 +69,24 @@ function setFieldError(field, message) {
 
 
 
+// Live Total Cost Calculation
+function updateTotalCost() {
+
+    if (!totalCostInput) return;
+
+    const qty = parseFloat(quantityInput.value) || 0;
+    const price = parseFloat(purchasePriceInput.value) || 0;
+    const total = qty * price;
+
+    totalCostInput.value = total.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+
+}
+
+
+
 // Display date as M/D/YYYY
 function setPurchaseDateToday() {
 
@@ -108,11 +127,26 @@ function getBackendDateFormat(displayDate) {
 
 
 
-purchasePriceInput.addEventListener("input", () => {
+if (quantityInput) {
 
-    purchasePriceTouchedByUser = true;
+    quantityInput.addEventListener("input", updateTotalCost);
 
-});
+}
+
+
+
+
+if (purchasePriceInput) {
+
+    purchasePriceInput.addEventListener("input", () => {
+
+        purchasePriceTouchedByUser = true;
+
+        updateTotalCost();
+
+    });
+
+}
 
 
 
@@ -247,8 +281,15 @@ async function verifyTickerAndPrefillPrice(rawTicker) {
 
 
 
-            purchasePriceHint.textContent =
+            if (purchasePriceHint) {
+
+                purchasePriceHint.textContent =
                     `Auto-filled from ${ticker}'s live market price (${formatCurrency(result.price)}).`;
+
+            }
+
+
+            updateTotalCost();
 
         }
 
@@ -406,6 +447,13 @@ form.addEventListener("submit", async(event)=>{
 
 
         stockSuggestions.innerHTML = "";
+
+
+        if (totalCostInput) {
+
+            totalCostInput.value = "0.00";
+
+        }
 
 
 
