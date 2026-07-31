@@ -1,4 +1,4 @@
-import { addHolding, searchStocks, getStockPrice } from "./api.js";
+import { addHolding, searchStocks, getStockPrice, getTrendingTickers } from "./api.js";
 import { showToast } from "./toast.js";
 import { refreshBalance } from "./balance.js";
 import { formatCurrency } from "./format.js";
@@ -579,3 +579,73 @@ document.addEventListener("click",(event)=>{
 
 
 });
+
+
+
+// Popular tickers widget
+
+const trendingListEl = document.getElementById("trendingList");
+
+async function loadTrendingTickers() {
+
+    if (!trendingListEl) {
+        return;
+    }
+
+    try {
+
+        const movers = await getTrendingTickers();
+
+        if (!movers || movers.length === 0) {
+            trendingListEl.innerHTML = "<p>No trending data available right now.</p>";
+            return;
+        }
+
+        trendingListEl.innerHTML = "";
+
+        movers.forEach((mover) => {
+
+            const item = document.createElement("div");
+            item.className = "trending-item";
+
+            const changeClass = mover.changePercent >= 0 ? "gain-positive" : "gain-negative";
+            const changeSign = mover.changePercent >= 0 ? "+" : "";
+
+            item.innerHTML = `
+                <span>
+                    <span class="trending-ticker">${mover.ticker}</span>
+                    <span class="trending-name">${mover.name}</span>
+                </span>
+                <span class="trending-price">
+                    ${formatCurrency(mover.price)}
+                    <span class="trending-change ${changeClass}">${changeSign}${mover.changePercent.toFixed(2)}%</span>
+                </span>
+            `;
+
+            item.addEventListener("click", async () => {
+
+                tickerInput.value = mover.ticker;
+                stockSuggestions.innerHTML = "";
+
+                typeInput.value = TYPE_MAP.stock;
+
+                setPurchaseDateToday();
+
+                await verifyTickerAndPrefillPrice(mover.ticker);
+
+            });
+
+            trendingListEl.appendChild(item);
+
+        });
+
+    } catch (error) {
+
+        trendingListEl.innerHTML = "<p>Could not load trending tickers.</p>";
+        console.error(error);
+
+    }
+
+}
+
+loadTrendingTickers();

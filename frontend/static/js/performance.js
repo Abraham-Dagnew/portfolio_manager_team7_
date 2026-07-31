@@ -8,7 +8,7 @@ const contentEl = document.getElementById("performance-content");
 const tableBodyEl = document.getElementById("holdings-table-body");
 const lastUpdatedEl = document.getElementById("last-updated");
 
-const ALLOCATION_COLORS = ["#7c3aed", "#4f46e5", "#16a34a", "#f59e0b", "#dc2626", "#0ea5e9", "#db2777"];
+const ALLOCATION_COLORS = ["#012B51", "#0E4C7A", "#1C74A8", "#4A9BC7", "#8FC1DE", "#052647", "#B0C1D1"];
 
 function formatPercent(value) {
     return `${Number(value).toFixed(2)}%`;

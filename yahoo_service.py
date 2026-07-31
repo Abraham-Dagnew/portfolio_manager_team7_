@@ -246,6 +246,49 @@ def search_symbols(query: str, max_results: int = 8) -> list[dict]:
 
 
 
+def get_trending_tickers(screen: str = "most_actives", count: int = 8) -> list[dict]:
+    """
+    Fetch real trending tickers from Yahoo Finance's screener (the same
+    data source that powers Yahoo's own "most active" / "day gainers"
+    pages), for the Buy page's popular tickers widget.
+
+    Args:
+        screen (str): Yahoo screener id, e.g. "most_actives",
+            "day_gainers", "day_losers".
+        count (int): Max number of tickers to return.
+
+    Returns:
+        list[dict]: [{"ticker": "AAPL", "name": "Apple Inc.",
+            "price": 308.91, "changePercent": -7.35}, ...]
+    """
+
+    try:
+        result = yf.screen(screen, count=count)
+        quotes = result.get("quotes", []) or []
+    except Exception as e:
+        print(f"[ERROR] Trending tickers fetch failed for '{screen}': {e}")
+        return []
+
+    movers = []
+
+    for quote in quotes:
+        symbol = quote.get("symbol")
+        price = quote.get("regularMarketPrice")
+        change_percent = quote.get("regularMarketChangePercent")
+
+        if not symbol or price is None or change_percent is None:
+            continue
+
+        movers.append({
+            "ticker": symbol.strip().upper(),
+            "name": quote.get("shortName") or quote.get("longName") or symbol,
+            "price": round(float(price), 2),
+            "changePercent": round(float(change_percent), 2),
+        })
+
+    return movers
+
+
 # Standalone test
 
 if __name__ == "__main__":

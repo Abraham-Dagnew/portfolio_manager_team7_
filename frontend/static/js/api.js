@@ -128,3 +128,14 @@ export async function getStockPrice(ticker) {
     }
     return await response.json();
 }
+
+// GET /stocks/trending
+// Popular tickers widget on the Buy page: live price + daily % change
+// for a handful of real, currently most-active tickers.
+export async function getTrendingTickers() {
+    const response = await fetch(`${API_BASE_URL}/stocks/trending`);
+    if (!response.ok) {
+        throw new Error(await extractErrorMessage(response, "Failed to load trending tickers"));
+    }
+    return await response.json();
+}
