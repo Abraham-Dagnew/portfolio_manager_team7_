@@ -1,5 +1,6 @@
 import { getBalance, depositFunds, withdrawFunds } from "./api.js";
 import { showToast } from "./toast.js";
+import { formatCurrency } from "./format.js";
 
 const amountEl = document.getElementById("balance-amount");
 const errorEl = document.getElementById("balance-error");
@@ -7,10 +8,6 @@ const depositForm = document.getElementById("depositForm");
 const fundsAmountInput = document.getElementById("fundsAmount");
 const depositSubmitBtn = document.getElementById("depositSubmit");
 const withdrawSubmitBtn = document.getElementById("withdrawSubmit");
-
-function formatCurrency(value) {
-    return `$${Number(value).toFixed(2)}`;
-}
 
 function readAmount() {
     const raw = fundsAmountInput.value;

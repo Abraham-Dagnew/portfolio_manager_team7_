@@ -1,4 +1,5 @@
 import { getPerformanceData } from "./api.js";
+import { formatCurrency, formatNumber } from "./format.js";
 
 const loadingEl = document.getElementById("performance-loading");
 const errorEl = document.getElementById("performance-error");
@@ -8,10 +9,6 @@ const tableBodyEl = document.getElementById("holdings-table-body");
 const lastUpdatedEl = document.getElementById("last-updated");
 
 const ALLOCATION_COLORS = ["#7c3aed", "#4f46e5", "#16a34a", "#f59e0b", "#dc2626", "#0ea5e9", "#db2777"];
-
-function formatCurrency(value) {
-    return `$${Number(value).toFixed(2)}`;
-}
 
 function formatPercent(value) {
     return `${Number(value).toFixed(2)}%`;
@@ -43,7 +40,7 @@ function renderTable(holdings) {
 
         row.innerHTML = `
             <td>${holding.ticker}</td>
-            <td>${holding.quantity}</td>
+            <td>${formatNumber(holding.quantity)}</td>
             <td>${formatCurrency(holding.purchasePrice)}</td>
             <td>${formatCurrency(holding.currentPrice)}</td>
             <td>${formatCurrency(holding.totalValue)}</td>
