@@ -1,6 +1,7 @@
 import { getPortfolio, deleteHolding } from './api.js';
 import { showToast } from './toast.js';
 import { refreshBalance } from './balance.js';
+import { formatCurrency, formatNumber } from './format.js';
 
 document.addEventListener("DOMContentLoaded", async () => {
 
@@ -67,10 +68,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                         </span>
                     </td>
 
-                    <td>${item.quantity}</td>
+                    <td>${formatNumber(item.quantity)}</td>
 
                     <td>
-                        $${Number(item.purchasePrice).toFixed(2)}
+                        ${formatCurrency(item.purchasePrice)}
                     </td>
 
                     <td>

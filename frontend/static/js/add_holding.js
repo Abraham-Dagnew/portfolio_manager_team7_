@@ -1,6 +1,7 @@
 import { addHolding, searchStocks, getStockPrice } from "./api.js";
 import { showToast } from "./toast.js";
 import { refreshBalance } from "./balance.js";
+import { formatCurrency } from "./format.js";
 
 
 const form = document.getElementById("addHoldingForm");
@@ -247,7 +248,7 @@ async function verifyTickerAndPrefillPrice(rawTicker) {
 
 
             purchasePriceHint.textContent =
-                `Filled from ${ticker}'s live price ($${result.price.toFixed(2)}).`;
+                    `Auto-filled from ${ticker}'s live market price (${formatCurrency(result.price)}).`;
 
         }
 
