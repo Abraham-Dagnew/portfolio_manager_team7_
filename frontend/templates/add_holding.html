@@ -1,269 +1,201 @@
 {% extends "base.html" %}
 
-{% block title %}Add Holding{% endblock %}
+{% block title %}Buy{% endblock %}
 
 {% block content %}
 
-<style>
-    .add-card {
-        max-width: 550px;
-        margin: 40px auto;
-        background: #ffffff;
-        padding: 35px;
-        border-radius: 14px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
-    }
-
-    .add-card h2 {
-        margin-bottom: 8px;
-        color: #1e293b;
-    }
-
-    .subtitle {
-        color: #64748b;
-        margin-bottom: 25px;
-    }
-
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        margin-bottom: 18px;
-        position: relative;
-    }
-
-    .form-group label {
-        font-weight: 600;
-        margin-bottom: 6px;
-        color: #334155;
-    }
-
-    .form-group input,
-    .form-group select {
-        padding: 12px;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        font-size: 15px;
-        transition: all 0.2s ease;
-    }
-
-    .form-group input:focus,
-    .form-group select:focus {
-        outline: none;
-        border-color: #2563eb;
-        box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
-    }
-
-    .field-error {
-        color: #dc2626;
-        font-size: 0.85rem;
-        margin-top: 5px;
-        min-height: 18px;
-    }
-
-    /* Ticker autocomplete dropdown (stocks + bonds) */
-    .stock-suggestions {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        z-index: 20;
-        background: #ffffff;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        margin-top: 4px;
-        max-height: 220px;
-        overflow-y: auto;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    }
-
-    .stock-suggestions:empty {
-        display: none;
-        border: none;
-        box-shadow: none;
-    }
-
-    .stock-option {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 12px;
-        cursor: pointer;
-        border-bottom: 1px solid #f1f5f9;
-    }
-
-    .stock-option:last-child {
-        border-bottom: none;
-    }
-
-    .stock-option:hover {
-        background: #eff6ff;
-    }
-
-    .stock-option strong {
-        color: #1e293b;
-        min-width: 55px;
-    }
-
-    .stock-option span {
-        color: #64748b;
-        font-size: 0.9rem;
-        flex: 1;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .stock-option em {
-        font-style: normal;
-        font-size: 0.75rem;
-        color: #2563eb;
-        background: #eff6ff;
-        padding: 2px 8px;
-        border-radius: 999px;
-        text-transform: capitalize;
-    }
-
-    .price-hint {
-        font-size: 0.8rem;
-        color: #64748b;
-        margin-top: 5px;
-        min-height: 16px;
-    }
-
-    #submitBtn {
-        width: 100%;
-        padding: 14px;
-        background: #2563eb;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 16px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.2s ease;
-    }
-
-    #submitBtn:hover {
-        background: #1d4ed8;
-    }
-
-    #submitBtn:disabled {
-        background: #94a3b8;
-        cursor: not-allowed;
-    }
-
-    #message {
-        text-align: center;
-        margin-top: 18px;
-        font-weight: 600;
-        min-height: 20px;
-    }
-
-    @media (max-width: 600px) {
-        .add-card {
-            margin: 20px;
-            padding: 25px;
-        }
-    }
-</style>
-
 <div class="add-card">
 
-    <h2>Add Holding</h2>
+    <h2>Buy</h2>
+
     <p class="subtitle">
-        Add a stock, bond, cash position, or ETF to your portfolio.
+        Search for an asset and enter the quantity you want to purchase.
     </p>
+
 
     <form id="addHoldingForm" novalidate>
 
-    <div class="form-group">
-        <label for="ticker">Search Asset</label>
 
-        <input
-            type="text"
-            id="ticker"
-            placeholder="Search ticker (e.g. AAPL, TSLA)"
-            autocomplete="off">
+        <!-- Ticker Search -->
+        <div class="form-group">
 
-        <div id="stockSuggestions" class="stock-suggestions"></div>
-
-        <span class="field-error" id="tickerError"></span>
-    </div>
+            <label for="ticker">
+                Search Asset
+            </label>
 
 
-    <div class="form-group">
-        <label for="type">Asset Type</label>
-
-        <select id="type">
-            <option value="">Select Type</option>
-            <option value="Stock">Stock</option>
-            <option value="ETF">ETF</option>
-            <option value="Bond">Bond</option>
-            <option value="Cash">Cash</option>
-        </select>
-
-        <span class="field-error" id="typeError"></span>
-    </div>
+            <input
+                type="text"
+                id="ticker"
+                placeholder="Search ticker (e.g. AAPL, TSLA)"
+                autocomplete="off"
+            >
 
 
-    <div class="form-group">
-        <label for="quantity">Quantity / Units</label>
-
-        <input
-            type="number"
-            id="quantity"
-            step="0.01"
-            min="0"
-            placeholder="Example: 10">
-
-        <span class="field-error" id="quantityError"></span>
-    </div>
+            <div 
+                id="stockSuggestions" 
+                class="stock-suggestions">
+            </div>
 
 
-    <div class="form-group">
-        <label for="purchasePrice">
-            Purchase Price Per Unit ($)
-        </label>
+            <span 
+                class="field-error" 
+                id="tickerError">
+            </span>
 
-        <input
-            type="number"
-            id="purchasePrice"
-            step="0.01"
-            min="0"
-            placeholder="Example: 150.00">
-
-        <span class="price-hint" id="purchasePriceHint">
-            Auto-filled from live market price. You can edit it.
-        </span>
-
-        <span class="field-error" id="purchasePriceError"></span>
-    </div>
+        </div>
 
 
-    <div class="form-group">
-        <label for="purchaseDate">
-            Purchase Date
-        </label>
 
-        <input
-            type="date"
-            id="purchaseDate"
-            max="">
+        <!-- Asset Type -->
+        <div class="form-group">
 
-        <span class="field-error" id="purchaseDateError"></span>
-    </div>
+            <label for="type">
+                Asset Type
+            </label>
 
 
-    <button type="submit" id="submitBtn">
-        Add Holding
-    </button>
+            <select 
+                id="type"
+                disabled
+            >
 
-</form>
+                <option value="">
+                    Select Type
+                </option>
+
+                <option value="Stock">
+                    Stock
+                </option>
+
+                <option value="ETF">
+                    ETF
+                </option>
+
+                <option value="Bond">
+                    Bond
+                </option>
+
+                <option value="Cash">
+                    Cash
+                </option>
+
+            </select>
+
+
+            <span 
+                class="field-error" 
+                id="typeError">
+            </span>
+
+        </div>
+
+
+
+
+        <!-- Quantity -->
+        <div class="form-group">
+
+            <label for="quantity">
+                Quantity / Units
+            </label>
+
+
+            <input
+                type="number"
+                id="quantity"
+                step="0.01"
+                min="0"
+                placeholder="Example: 10"
+            >
+
+
+            <span 
+                class="field-error" 
+                id="quantityError">
+            </span>
+
+        </div>
+
+
+
+
+        <!-- Purchase Price -->
+        <div class="form-group">
+
+            <label for="purchasePrice">
+                Purchase Price Per Unit ($)
+            </label>
+
+
+            <input
+                type="number"
+                id="purchasePrice"
+                step="0.01"
+                disabled
+            >
+
+
+            <span 
+                class="price-hint" 
+                id="purchasePriceHint">
+                Automatically populated from current market price.
+            </span>
+
+
+            <span 
+                class="field-error" 
+                id="purchasePriceError">
+            </span>
+
+        </div>
+
+
+
+
+        <!-- Purchase Date -->
+        <div class="form-group">
+
+            <label for="purchaseDate">
+                Purchase Date
+            </label>
+
+
+            <input
+                type="text"
+                id="purchaseDate"
+                readonly
+                placeholder=""
+            >
+
+
+            <span 
+                class="field-error" 
+                id="purchaseDateError">
+            </span>
+
+        </div>
+
+
+
+
+        <button 
+            type="submit" 
+            id="submitBtn">
+            Buy
+        </button>
+
+
+    </form>
+
 
     <p id="message"></p>
 
+
 </div>
 
+
 <script type="module" src="/static/js/add_holding.js"></script>
+
 
 {% endblock %}
