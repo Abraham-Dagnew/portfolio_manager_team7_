@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <div class="empty-state card p-4 text-center">
                     <h3>No holdings found</h3>
                     <p class="text-muted mb-0">
-                        Click "+ Add Holding" to start building your portfolio.
+                        Click "Buy" to start building your portfolio.
                     </p>
                 </div>
             `;

@@ -1,12 +1,10 @@
-// Import the shared API functions
 import { addHolding, searchStocks, getStockPrice } from "./api.js";
 import { showToast } from "./toast.js";
 import { refreshBalance } from "./balance.js";
 import { formatCurrency } from "./format.js";
 
-// Get references to the form and message display area
+
 const form = document.getElementById("addHoldingForm");
-const message = document.getElementById("message");
 const submitBtn = document.getElementById("submitBtn");
 
 const tickerInput = document.getElementById("ticker");
@@ -17,13 +15,11 @@ const purchaseDateInput = document.getElementById("purchaseDate");
 const stockSuggestions = document.getElementById("stockSuggestions");
 const purchasePriceHint = document.getElementById("purchasePriceHint");
 
-// Prevent selecting future dates from the browser date picker
-const today = new Date().toISOString().split("T")[0];
-purchaseDateInput.max = today;
 
 let searchTimer;
 
 const TICKER_REGEX = /^[A-Z]{1,5}$/;
+
 
 const TYPE_MAP = {
     stock: "Stock",
@@ -32,9 +28,10 @@ const TYPE_MAP = {
     cash: "Cash",
 };
 
-let purchasePriceTouchedByUser = false;
 
+let purchasePriceTouchedByUser = false;
 let lastVerifiedTicker = null;
+
 
 
 const fieldErrorEls = {
@@ -46,9 +43,10 @@ const fieldErrorEls = {
 };
 
 
+
 function clearFieldErrors() {
 
-    Object.values(fieldErrorEls).forEach((el) => {
+    Object.values(fieldErrorEls).forEach(el => {
 
         if (el) {
             el.textContent = "";
@@ -59,15 +57,55 @@ function clearFieldErrors() {
 }
 
 
-function setFieldError(field, text) {
 
-    const el = fieldErrorEls[field];
+function setFieldError(field, message) {
 
-    if (el) {
-        el.textContent = text;
+    if (fieldErrorEls[field]) {
+        fieldErrorEls[field].textContent = message;
     }
 
 }
+
+
+
+// Display date as M/D/YYYY
+function setPurchaseDateToday() {
+
+    const today = new Date();
+
+    purchaseDateInput.value =
+        `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+
+}
+
+
+
+// Convert display date back to backend format
+function getBackendDateFormat(displayDate) {
+
+    if (!displayDate) {
+        return "";
+    }
+
+
+    const parts = displayDate.split("/");
+
+
+    if (parts.length !== 3) {
+        return "";
+    }
+
+
+    const month = parts[0].padStart(2, "0");
+    const day = parts[1].padStart(2, "0");
+    const year = parts[2];
+
+
+    return `${year}-${month}-${day}`;
+
+}
+
+
 
 
 purchasePriceInput.addEventListener("input", () => {
@@ -75,6 +113,8 @@ purchasePriceInput.addEventListener("input", () => {
     purchasePriceTouchedByUser = true;
 
 });
+
+
 
 
 function validate(holding) {
@@ -85,7 +125,7 @@ function validate(holding) {
     if (!holding.ticker || !TICKER_REGEX.test(holding.ticker)) {
 
         errors.ticker =
-            "Ticker must be 1-5 uppercase letters (example: AAPL).";
+            "Ticker must be 1-5 uppercase letters.";
 
     }
 
@@ -109,39 +149,48 @@ function validate(holding) {
     if (!Number.isFinite(holding.purchasePrice) || holding.purchasePrice <= 0) {
 
         errors.purchasePrice =
-            "Purchase price must be a positive number.";
+            "Purchase price must be positive.";
 
     }
+
 
 
     if (!holding.purchaseDate) {
 
-    errors.purchaseDate =
-        "Please select a purchase date.";
-
-} else {
-
-    const selectedDate = new Date(holding.purchaseDate);
-    const currentDate = new Date();
-
-    // Ignore time, compare dates only
-    selectedDate.setHours(0, 0, 0, 0);
-    currentDate.setHours(0, 0, 0, 0);
-
-
-    if (selectedDate > currentDate) {
-
         errors.purchaseDate =
-            "Purchase date cannot be in the future.";
+            "Please select a purchase date.";
+
+    }
+    else {
+
+        const selectedDate =
+            new Date(holding.purchaseDate + "T00:00:00");
+
+
+        const currentDate =
+            new Date();
+
+
+        selectedDate.setHours(0,0,0,0);
+        currentDate.setHours(0,0,0,0);
+
+
+
+        if (selectedDate > currentDate) {
+
+            errors.purchaseDate =
+                "Purchase date cannot be in the future.";
+
+        }
 
     }
 
-}
 
 
     return errors;
 
 }
+
 
 
 
@@ -153,9 +202,14 @@ function isCashType() {
 
 
 
+
+
 async function verifyTickerAndPrefillPrice(rawTicker) {
 
-    const ticker = rawTicker.trim().toUpperCase();
+
+    const ticker =
+        rawTicker.trim().toUpperCase();
+
 
 
     if (!TICKER_REGEX.test(ticker) || isCashType()) {
@@ -163,14 +217,19 @@ async function verifyTickerAndPrefillPrice(rawTicker) {
     }
 
 
+
     if (ticker === lastVerifiedTicker) {
         return;
     }
 
 
+
     try {
 
-        const result = await getStockPrice(ticker);
+
+        const result =
+            await getStockPrice(ticker);
+
 
 
         lastVerifiedTicker = ticker;
@@ -179,26 +238,32 @@ async function verifyTickerAndPrefillPrice(rawTicker) {
         setFieldError("ticker", "");
 
 
+
         if (!purchasePriceTouchedByUser) {
+
 
             purchasePriceInput.value =
                 result.price.toFixed(2);
 
 
+
             purchasePriceHint.textContent =
-                `Filled from ${ticker}'s live price (${formatCurrency(result.price)}). You can change it.`;
+                    `Auto-filled from ${ticker}'s live market price (${formatCurrency(result.price)}).`;
 
         }
 
 
-    } catch (error) {
+
+    }
+    catch(error) {
+
 
         lastVerifiedTicker = null;
 
 
         setFieldError(
             "ticker",
-            error.message || `${ticker} is not a valid ticker.`
+            error.message || "Invalid ticker."
         );
 
     }
@@ -207,33 +272,38 @@ async function verifyTickerAndPrefillPrice(rawTicker) {
 
 
 
+
+
 tickerInput.addEventListener("blur", () => {
 
-    verifyTickerAndPrefillPrice(tickerInput.value);
+    verifyTickerAndPrefillPrice(
+        tickerInput.value
+    );
 
 });
+
+
 
 
 
 typeInput.addEventListener("change", () => {
 
-    if (isCashType()) {
 
-        setFieldError("ticker", "");
+    verifyTickerAndPrefillPrice(
+        tickerInput.value
+    );
 
-    } else {
-
-        verifyTickerAndPrefillPrice(tickerInput.value);
-
-    }
 
 });
 
 
 
-// Submit form
 
-form.addEventListener("submit", async (event) => {
+
+
+
+form.addEventListener("submit", async(event)=>{
+
 
     event.preventDefault();
 
@@ -241,32 +311,46 @@ form.addEventListener("submit", async (event) => {
     clearFieldErrors();
 
 
+
     const holding = {
 
-        ticker: tickerInput.value.trim().toUpperCase(),
 
-        type: typeInput.value,
+        ticker:
+            tickerInput.value.trim().toUpperCase(),
 
-        quantity: Number(quantityInput.value),
 
-        purchasePrice: Number(purchasePriceInput.value),
+        type:
+            typeInput.value,
 
-        purchaseDate: purchaseDateInput.value,
+
+        quantity:
+            Number(quantityInput.value),
+
+
+        purchasePrice:
+            Number(purchasePriceInput.value),
+
+
+        purchaseDate:
+            getBackendDateFormat(
+                purchaseDateInput.value
+            ),
 
     };
 
 
 
-    const errors = validate(holding);
+    const errors =
+        validate(holding);
 
 
 
-    if (Object.keys(errors).length > 0) {
+    if(Object.keys(errors).length > 0){
 
 
-        Object.entries(errors).forEach(([field, text]) => {
+        Object.entries(errors).forEach(([field,message])=>{
 
-            setFieldError(field, text);
+            setFieldError(field,message);
 
         });
 
@@ -283,123 +367,79 @@ form.addEventListener("submit", async (event) => {
 
 
 
+
+
     submitBtn.disabled = true;
-
-    submitBtn.textContent = "Adding...";
-
-
-
-    if (
-        holding.type !== "Cash" &&
-        holding.ticker !== lastVerifiedTicker
-    ) {
-
-
-        try {
-
-            await getStockPrice(holding.ticker);
-
-            lastVerifiedTicker = holding.ticker;
-
-
-        } catch (error) {
-
-
-            setFieldError(
-                "ticker",
-                error.message || `${holding.ticker} is not a valid ticker.`
-            );
-
-
-            showToast(
-                "Invalid ticker.",
-                "error"
-            );
-
-
-            submitBtn.disabled = false;
-
-            submitBtn.textContent = "Add Holding";
-
-            return;
-
-        }
-
-    }
+    submitBtn.textContent = "Buying...";
 
 
 
-    try {
+    try{
 
 
-        const response = await addHolding(holding);
+        const response =
+            await addHolding(holding);
 
 
 
         showToast(
-            response.message || "Holding added successfully!",
+            response.message || "Holding purchased successfully!",
             "success"
         );
 
+
         refreshBalance();
+
+
 
         form.reset();
 
-        purchaseDateInput.max = today;
 
 
-        stockSuggestions.innerHTML = "";
+        purchaseDateInput.value = "";
 
 
         purchasePriceTouchedByUser = false;
 
 
-        purchasePriceHint.textContent =
-            "Auto-filled from live price once a valid ticker is entered.";
-
-
         lastVerifiedTicker = null;
 
 
+        stockSuggestions.innerHTML = "";
 
-    } catch (error) {
 
 
-        if (/ticker/i.test(error.message)) {
-
-            setFieldError(
-                "ticker",
-                error.message
-            );
-
-        }
+    }
+    catch(error){
 
 
         showToast(
-            error.message || "Failed to add holding.",
+            error.message || "Purchase failed.",
             "error"
         );
 
 
-
-    } finally {
+    }
+    finally{
 
 
         submitBtn.disabled = false;
 
-
-        submitBtn.textContent = "Add Holding";
+        submitBtn.textContent = "Buy";
 
 
     }
+
 
 });
 
 
 
-// Stock autocomplete
 
-tickerInput.addEventListener("input", () => {
+
+
+
+tickerInput.addEventListener("input",()=>{
 
 
     clearTimeout(searchTimer);
@@ -408,45 +448,47 @@ tickerInput.addEventListener("input", () => {
     lastVerifiedTicker = null;
 
 
-    const query = tickerInput.value.trim();
+    const query =
+        tickerInput.value.trim();
 
 
 
-    if (query.length < 2) {
+    if(query.length < 2){
 
-        stockSuggestions.innerHTML = "";
-
+        stockSuggestions.innerHTML="";
         return;
 
     }
 
 
 
-    searchTimer = setTimeout(async () => {
+    searchTimer=setTimeout(async()=>{
 
 
-        try {
+        try{
 
 
-            const results = await searchStocks(query);
-
-
-
-            stockSuggestions.innerHTML = "";
+            const results =
+                await searchStocks(query);
 
 
 
-            results.forEach(stock => {
-
-
-                const option = document.createElement("div");
-
-
-                option.className = "stock-option";
+            stockSuggestions.innerHTML="";
 
 
 
-                option.innerHTML = `
+            results.forEach(stock=>{
+
+
+                const option =
+                    document.createElement("div");
+
+
+                option.className="stock-option";
+
+
+
+                option.innerHTML=`
 
                     <strong>${stock.ticker}</strong>
 
@@ -458,13 +500,15 @@ tickerInput.addEventListener("input", () => {
 
 
 
-                option.addEventListener("click", async () => {
+                option.addEventListener("click",async()=>{
 
 
-                    tickerInput.value = stock.ticker;
+                    tickerInput.value =
+                        stock.ticker;
 
 
-                    stockSuggestions.innerHTML = "";
+
+                    stockSuggestions.innerHTML="";
 
 
 
@@ -473,15 +517,23 @@ tickerInput.addEventListener("input", () => {
 
 
 
-                    if (mappedType) {
+                    if(mappedType){
 
-                        typeInput.value = mappedType;
+                        typeInput.value =
+                            mappedType;
 
                     }
 
 
 
-                    await verifyTickerAndPrefillPrice(stock.ticker);
+                    // Populate date after stock selection
+                    setPurchaseDateToday();
+
+
+
+                    await verifyTickerAndPrefillPrice(
+                        stock.ticker
+                    );
 
 
                 });
@@ -491,34 +543,37 @@ tickerInput.addEventListener("input", () => {
                 stockSuggestions.appendChild(option);
 
 
+
             });
 
 
-
-        } catch (error) {
+        }
+        catch(error){
 
             console.error(error);
 
         }
 
 
+    },300);
 
-    }, 300);
 
 
 });
 
 
 
-document.addEventListener("click", (event) => {
 
 
-    if (
+document.addEventListener("click",(event)=>{
+
+
+    if(
         !tickerInput.contains(event.target) &&
         !stockSuggestions.contains(event.target)
-    ) {
+    ){
 
-        stockSuggestions.innerHTML = "";
+        stockSuggestions.innerHTML="";
 
     }
 
