@@ -259,6 +259,53 @@ th {
 }
 
 
+.sell-btn {
+
+    padding:.4rem 1rem;
+    border:1.5px solid var(--red);
+    border-radius:6px;
+
+    background:white;
+    color:var(--red);
+
+    font-weight:700;
+    font-size:.85rem;
+    letter-spacing:.02em;
+
+    cursor:pointer;
+
+    transition:background .15s ease, color .15s ease, box-shadow .15s ease, transform .1s ease;
+
+}
+
+
+.sell-btn:hover {
+
+    background:var(--red);
+    color:white;
+    box-shadow:0 0 0 3px rgba(220,38,38,.25);
+
+}
+
+
+.sell-btn:active {
+
+    transform:scale(.96);
+
+}
+
+
+.sell-btn:disabled {
+
+    border-color:#f1a3a3;
+    color:#f1a3a3;
+    background:white;
+    cursor:not-allowed;
+    box-shadow:none;
+
+}
+
+
 
 /* =========================
    TOAST NOTIFICATIONS
