@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     let sellModalTicker = null;
     let sellModalMaxQuantity = 0;
     let sellModalLivePrice = null;
+    let sellModalAveragePrice = null;
 
     if (!holdingsContainer || !transactionsContainer || !holdingsPanel || !transactionsPanel) {
         return;
@@ -99,24 +100,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function renderSellModalDetails() {
-        if (!sellModalMessage || !sellModalInput || sellModalLivePrice === null) {
+        if (!sellModalMessage || !sellModalInput || sellModalLivePrice === null || sellModalAveragePrice === null) {
             return;
         }
 
         const quantityToSell = Number(String(sellModalInput.value).replace(/,/g, "").trim()) || 0;
         const estimatedProceeds = quantityToSell * sellModalLivePrice;
+        const estimatedGainLoss = (sellModalLivePrice - sellModalAveragePrice) * quantityToSell;
+        const gainLossLabel = estimatedGainLoss >= 0 ? "Estimated gain" : "Estimated loss";
 
         sellModalMessage.innerHTML = `
             Live sell price: <strong>${formatCurrency(sellModalLivePrice)}</strong><br>
+            Average buy price: <strong>${formatCurrency(sellModalAveragePrice)}</strong><br>
             Estimated proceeds: <strong>${formatCurrency(estimatedProceeds)}</strong><br>
+            ${gainLossLabel}: <strong>${formatCurrency(Math.abs(estimatedGainLoss))}</strong><br>
             Maximum available: <strong>${formatNumber(sellModalMaxQuantity)} shares</strong>
         `;
     }
 
-    async function openSellModal(ticker, quantity) {
+    async function openSellModal(ticker, quantity, averagePrice) {
         ensureSellModal();
         sellModalTicker = ticker;
         sellModalMaxQuantity = Number(quantity);
+        sellModalAveragePrice = Number(averagePrice);
         sellModalLivePrice = null;
         sellModalInput.value = String(quantity);
         sellModalInput.max = String(quantity);
@@ -154,6 +160,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         sellModalTicker = null;
         sellModalMaxQuantity = 0;
         sellModalLivePrice = null;
+        sellModalAveragePrice = null;
     }
 
     async function confirmSellModal() {
@@ -356,7 +363,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        openSellModal(ticker, currentHolding.quantity);
+        openSellModal(ticker, currentHolding.quantity, currentHolding.averagePrice);
     }
 
     tabButtons.forEach((button) => {
