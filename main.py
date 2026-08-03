@@ -107,7 +107,6 @@ def build_holdings_snapshot(rows):
     grouped = defaultdict(
         lambda: {
             "buyQuantity": 0.0,
-            "sellQuantity": 0.0,
             "buyValue": 0.0,
         }
     )
@@ -120,14 +119,24 @@ def build_holdings_snapshot(rows):
 
         bucket = grouped[ticker]
         if side == "sell":
-            bucket["sellQuantity"] += quantity
+            if bucket["buyQuantity"] <= 0:
+                continue
+
+            sell_quantity = min(quantity, bucket["buyQuantity"])
+            average_cost = bucket["buyValue"] / bucket["buyQuantity"] if bucket["buyQuantity"] else 0.0
+            bucket["buyQuantity"] = round(bucket["buyQuantity"] - sell_quantity, 4)
+            bucket["buyValue"] = round(bucket["buyValue"] - (sell_quantity * average_cost), 2)
+
+            if bucket["buyQuantity"] <= 0:
+                bucket["buyQuantity"] = 0.0
+                bucket["buyValue"] = 0.0
         else:
             bucket["buyQuantity"] += quantity
             bucket["buyValue"] += quantity * purchase_price
 
     holdings = []
     for ticker, bucket in grouped.items():
-        net_quantity = round(bucket["buyQuantity"] - bucket["sellQuantity"], 4)
+        net_quantity = round(bucket["buyQuantity"], 4)
         if net_quantity <= 0:
             continue
 
@@ -494,7 +503,7 @@ def sell_portfolio(sale: SellRequest):
         conn.close()
 
     return {
-        "message": f"Sold {sale.quantity:.1f} shares of {clean_ticker}",
+        "message": f"Sold {sale.quantity} shares of {clean_ticker}",
         "soldValue": sale_value,
         "remainingBalance": new_balance,
     }
