@@ -127,6 +127,30 @@ class PortfolioApiTests(unittest.TestCase):
             ],
         )
 
+    def test_get_portfolio_holdings_resets_after_full_close(self):
+        """
+        Verifies a fully closed position starts a fresh cost basis after a new buy.
+        """
+
+        fake_connection = FakeConnection(
+            rows=[
+                {"id": 1, "ticker": "INTC", "side": "buy", "quantity": 10, "purchasePrice": 80.0, "purchaseDate": "2026-07-20"},
+                {"id": 2, "ticker": "INTC", "side": "sell", "quantity": 10, "purchasePrice": 95.0, "purchaseDate": "2026-07-21"},
+                {"id": 3, "ticker": "INTC", "side": "buy", "quantity": 4, "purchasePrice": 90.71, "purchaseDate": "2026-07-22"},
+            ]
+        )
+
+        with patch("main.get_connection", return_value=fake_connection), patch(
+            "main.get_multiple_prices",
+            return_value={"INTC": 92.0},
+        ):
+            response = main.get_portfolio_holdings()
+
+        self.assertEqual(
+            response,
+            [{"ticker": "INTC", "averagePrice": 90.71, "quantity": 4.0, "currentPrice": 92.0}],
+        )
+
     def test_post_portfolio_inserts_and_returns_id(self):
         """
         Verifies a holding insert returns the new id and deducts its
