@@ -216,6 +216,22 @@ class PortfolioApiTests(unittest.TestCase):
         self.assertIn("999", ctx.exception.detail)
         self.assertFalse(fake_connection.committed)
 
+    def test_get_trending_returns_mover_list(self):
+        """
+        Verifies the trending endpoint passes through the movers list
+        from the Yahoo screener.
+        """
+
+        fake_movers = [
+            {"ticker": "AAPL", "name": "Apple Inc.", "price": 308.91, "changePercent": -7.35},
+            {"ticker": "NVDA", "name": "NVIDIA Corporation", "price": 200.75, "changePercent": 2.93},
+        ]
+
+        with patch("main.get_trending_tickers", return_value=fake_movers):
+            response = main.get_trending()
+
+        self.assertEqual(response, fake_movers)
+
     def test_get_balance_returns_cash(self):
         """
         Verifies the balance endpoint returns the current cash amount.

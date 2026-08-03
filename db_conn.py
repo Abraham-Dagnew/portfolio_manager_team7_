@@ -114,5 +114,6 @@ def create_balance_table():
 if __name__ == "__main__":
 
     create_table()
+    update_existing_table()
     create_balance_table()
 

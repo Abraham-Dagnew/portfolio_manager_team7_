@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 import uvicorn
 from db_conn import get_connection
 from pydantic import BaseModel, Field, field_validator
-from yahoo_service import get_multiple_prices, get_stock_price, search_symbols
+from yahoo_service import get_multiple_prices, get_stock_price, get_trending_tickers, search_symbols
 from math_logic import calculate_holding_performance, calculate_portfolio_performance
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -154,6 +154,17 @@ def get_price(ticker: str):
         )
 
     return {"ticker": clean_ticker, "price": price}
+
+
+@app.get("/stocks/trending")
+def get_trending():
+    """
+    Returns a handful of currently most-active real tickers with their
+    live price and % change since yesterday's close, for the Buy page's
+    popular tickers widget.
+    """
+
+    return get_trending_tickers()
 
 
 @app.get("/balance")
