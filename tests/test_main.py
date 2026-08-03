@@ -1,5 +1,11 @@
 """
-Tests for the FastAPI portfolio endpoints.
+Integration tests for the FastAPI app.
+
+These go through the real HTTP layer (routing, Pydantic request
+validation, and the global DomainError -> HTTP response handler) via
+FastAPI's TestClient, with the service layer mocked out. Business
+logic itself is covered by tests/test_services.py - this file verifies
+the web layer wires everything together correctly.
 """
 
 import os
@@ -7,370 +13,198 @@ import sys
 import unittest
 from unittest.mock import patch
 
-from fastapi import HTTPException
-
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+from fastapi.testclient import TestClient
+
 import main
+from errors import (
+    BalanceNotInitializedError,
+    InsufficientFundsError,
+    InsufficientSharesError,
+    InvalidTickerError,
+    TickerNotFoundError,
+)
+
+client = TestClient(main.app)
 
 
-class FakeCursor:
-    """
-    Lightweight cursor double for endpoint tests.
-    """
-
-    def __init__(self, rows=None, lastrowid=None, fetchone_results=None):
-        self.rows = rows or []
-        self.lastrowid = lastrowid
-        self.executed_queries = []
-        self.fetchone_results = list(fetchone_results) if fetchone_results else []
-
-    def execute(self, query, params=None):
-        self.executed_queries.append((query, params))
-
-    def fetchall(self):
-        return self.rows
-
-    def fetchone(self):
-        if self.fetchone_results:
-            return self.fetchone_results.pop(0)
-        return None
-
-    def close(self):
-        return None
-
-
-class FakeConnection:
-    """
-    Lightweight connection double for endpoint tests.
-
-    fetchone_results is a queue consumed in the order the endpoint under
-    test calls fetchone() (e.g. balance lookup, then holding lookup).
-    """
-
-    def __init__(self, rows=None, lastrowid=None, fetchone_results=None):
-        self.rows = rows or []
-        self.lastrowid = lastrowid
-        self.fetchone_results = fetchone_results
-        self.committed = False
-        self.rolled_back = False
-
-    def cursor(self, dictionary=False):
-        return FakeCursor(rows=self.rows, lastrowid=self.lastrowid, fetchone_results=self.fetchone_results)
-
-    def commit(self):
-        self.committed = True
-
-    def rollback(self):
-        self.rolled_back = True
-
-    def close(self):
-        return None
-
-
-class PortfolioApiTests(unittest.TestCase):
+class RootAndHealthTests(unittest.TestCase):
     def test_root_endpoint(self):
-        """
-        Verifies the root endpoint returns the running message.
-        """
-
-        response = main.root()
-        self.assertEqual(response, {"message": "Portfolio Manager API is running"})
+        response = client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Portfolio Manager API is running"})
 
     def test_health_endpoint(self):
-        """
-        Verifies the health endpoint returns ok.
-        """
+        response = client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
 
-        response = main.health_check()
-        self.assertEqual(response, {"status": "ok"})
 
-    def test_get_portfolio_returns_rows(self):
-        """
-        Verifies portfolio rows are returned from the mocked database.
-        """
+class PortfolioRouteTests(unittest.TestCase):
+    def test_get_portfolio_returns_service_data(self):
+        with patch("main.services.get_transactions", return_value=[{"id": 1, "ticker": "AAPL"}]):
+            response = client.get("/portfolio")
 
-        fake_connection = FakeConnection(rows=[{"id": 1, "ticker": "AAPL", "side": "buy"}])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [{"id": 1, "ticker": "AAPL"}])
 
-        with patch("main.get_connection", return_value=fake_connection):
-            response = main.get_portfolio()
+    def test_get_portfolio_holdings_returns_service_data(self):
+        fake_holdings = [{"ticker": "AAPL", "averagePrice": 150.0, "quantity": 10.0, "currentPrice": 160.0}]
 
-        self.assertEqual(response, [{"id": 1, "ticker": "AAPL", "side": "buy"}])
+        with patch("main.services.get_holdings", return_value=fake_holdings):
+            response = client.get("/portfolio/holdings")
 
-    def test_get_portfolio_holdings_aggregates_transactions(self):
-        """
-        Verifies raw transactions are aggregated into one holding per ticker.
-        """
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), fake_holdings)
 
-        fake_connection = FakeConnection(
-            rows=[
-                {"id": 1, "ticker": "AAPL", "side": "buy", "quantity": 10, "purchasePrice": 100.0, "purchaseDate": "2026-07-20"},
-                {"id": 2, "ticker": "AAPL", "side": "buy", "quantity": 5, "purchasePrice": 120.0, "purchaseDate": "2026-07-21"},
-                {"id": 3, "ticker": "AAPL", "side": "sell", "quantity": 3, "purchasePrice": 130.0, "purchaseDate": "2026-07-22"},
-                {"id": 4, "ticker": "MSFT", "side": "buy", "quantity": 2, "purchasePrice": 200.0, "purchaseDate": "2026-07-22"},
-            ]
-        )
+    def test_post_portfolio_success_calls_service_with_parsed_fields(self):
+        fake_response = {"message": "Holding added", "id": 7, "remainingBalance": 3497.5}
 
-        with patch("main.get_connection", return_value=fake_connection), patch(
-            "main.get_multiple_prices",
-            return_value={"AAPL": 150.0, "MSFT": 250.0},
-        ):
-            response = main.get_portfolio_holdings()
-
-        self.assertEqual(
-            response,
-            [
-                {"ticker": "AAPL", "averagePrice": 106.67, "quantity": 12.0, "currentPrice": 150.0},
-                {"ticker": "MSFT", "averagePrice": 200.0, "quantity": 2.0, "currentPrice": 250.0},
-            ],
-        )
-
-    def test_get_portfolio_holdings_resets_after_full_close(self):
-        """
-        Verifies a fully closed position starts a fresh cost basis after a new buy.
-        """
-
-        fake_connection = FakeConnection(
-            rows=[
-                {"id": 1, "ticker": "INTC", "side": "buy", "quantity": 10, "purchasePrice": 80.0, "purchaseDate": "2026-07-20"},
-                {"id": 2, "ticker": "INTC", "side": "sell", "quantity": 10, "purchasePrice": 95.0, "purchaseDate": "2026-07-21"},
-                {"id": 3, "ticker": "INTC", "side": "buy", "quantity": 4, "purchasePrice": 90.71, "purchaseDate": "2026-07-22"},
-            ]
-        )
-
-        with patch("main.get_connection", return_value=fake_connection), patch(
-            "main.get_multiple_prices",
-            return_value={"INTC": 92.0},
-        ):
-            response = main.get_portfolio_holdings()
-
-        self.assertEqual(
-            response,
-            [{"ticker": "INTC", "averagePrice": 90.71, "quantity": 4.0, "currentPrice": 92.0}],
-        )
-
-    def test_post_portfolio_inserts_and_returns_id(self):
-        """
-        Verifies a holding insert returns the new id and deducts its
-        cost from the cash balance.
-        """
-
-        fake_connection = FakeConnection(lastrowid=7, fetchone_results=[{"cash": 5000.0}])
-
-        with patch("main.get_connection", return_value=fake_connection), patch(
-            "main.get_stock_price", return_value=150.25
-        ):
-            response = main.post_portfolio(
-                main.HoldingCreate(
-                    ticker="aapl",
-                    type="stock",
-                    quantity=10,
-                    purchasePrice=150.25,
-                    purchaseDate="2026-07-24",
-                )
+        with patch("main.services.buy_holding", return_value=fake_response) as mock_buy:
+            response = client.post(
+                "/portfolio",
+                json={
+                    "ticker": "aapl",
+                    "type": "stock",
+                    "quantity": 10,
+                    "purchasePrice": 150.25,
+                    "purchaseDate": "2026-01-15",
+                },
             )
 
-        self.assertEqual(
-            response,
-            {"message": "Holding added", "id": 7, "remainingBalance": 3497.5},
-        )
-        self.assertTrue(fake_connection.committed)
-
-    def test_post_portfolio_rejects_insufficient_funds(self):
-        """
-        Verifies a purchase costing more than the available balance is
-        rejected with a clear 400 error and nothing is committed.
-        """
-
-        fake_connection = FakeConnection(fetchone_results=[{"cash": 100.0}])
-
-        with patch("main.get_connection", return_value=fake_connection), patch(
-            "main.get_stock_price", return_value=150.25
-        ):
-            with self.assertRaises(HTTPException) as ctx:
-                main.post_portfolio(
-                    main.HoldingCreate(
-                        ticker="aapl",
-                        type="stock",
-                        quantity=10,
-                        purchasePrice=150.25,
-                        purchaseDate="2026-07-24",
-                    )
-                )
-
-        self.assertEqual(ctx.exception.status_code, 400)
-        self.assertIn("Insufficient funds", ctx.exception.detail)
-        self.assertFalse(fake_connection.committed)
-        self.assertTrue(fake_connection.rolled_back)
-
-    def test_get_portfolio_performance_returns_holdings_and_summary(self):
-        """
-        Verifies performance endpoint enriches holdings with live prices
-        and returns an aggregate summary.
-        """
-
-        fake_connection = FakeConnection(
-            rows=[
-                {"id": 1, "ticker": "AAPL", "quantity": 10, "purchasePrice": 100.0},
-                {"id": 2, "ticker": "MSFT", "quantity": 5, "purchasePrice": 200.0},
-            ]
-        )
-        fake_prices = {"AAPL": 150.0, "MSFT": 180.0}
-
-        with patch("main.get_connection", return_value=fake_connection), patch(
-            "main.get_multiple_prices", return_value=fake_prices
-        ):
-            response = main.get_portfolio_performance()
-
-        self.assertEqual(len(response["holdings"]), 2)
-        self.assertEqual(response["holdings"][0]["currentPrice"], 150.0)
-        self.assertEqual(response["holdings"][0]["totalGain"], 500.0)
-        self.assertEqual(response["summary"]["totalValue"], 2400.0)
-        self.assertEqual(response["summary"]["totalGain"], 400.0)
-
-    def test_sell_portfolio_records_sale_and_updates_balance(self):
-        """
-        Verifies selling shares records a new sell transaction and
-        credits the cash balance at the live market price.
-        """
-
-        fake_connection = FakeConnection(
-            fetchone_results=[
-                {"quantity": 10.0},
-                {"type": "stock"},
-                {"cash": 500.0},
-            ]
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), fake_response)
+        mock_buy.assert_called_once_with(
+            ticker="AAPL",
+            asset_type="stock",
+            quantity=10.0,
+            purchase_price=150.25,
+            purchase_date="2026-01-15",
         )
 
-        with patch("main.get_connection", return_value=fake_connection), patch(
-            "main.get_stock_price", return_value=120.0
+    def test_post_portfolio_rejects_invalid_request_body(self):
+        """
+        Verifies Pydantic validation (negative quantity) returns 422
+        without ever reaching the service layer.
+        """
+
+        with patch("main.services.buy_holding") as mock_buy:
+            response = client.post(
+                "/portfolio",
+                json={
+                    "ticker": "AAPL",
+                    "type": "stock",
+                    "quantity": -5,
+                    "purchasePrice": 150.25,
+                    "purchaseDate": "2026-01-15",
+                },
+            )
+
+        self.assertEqual(response.status_code, 422)
+        mock_buy.assert_not_called()
+
+    def test_post_portfolio_translates_domain_error_to_400(self):
+        with patch(
+            "main.services.buy_holding",
+            side_effect=InsufficientFundsError("Insufficient funds: this purchase costs $1502.50 but you only have $100.00 available."),
         ):
-            response = main.sell_portfolio(main.SellRequest(ticker="aapl", quantity=3))
+            response = client.post(
+                "/portfolio",
+                json={
+                    "ticker": "AAPL",
+                    "type": "stock",
+                    "quantity": 10,
+                    "purchasePrice": 150.25,
+                    "purchaseDate": "2026-01-15",
+                },
+            )
 
-        self.assertEqual(
-            response,
-            {"message": "Sold 3.0 shares of AAPL", "soldValue": 360.0, "remainingBalance": 860.0},
-        )
-        self.assertTrue(fake_connection.committed)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Insufficient funds", response.json()["detail"])
 
-    def test_sell_portfolio_rejects_insufficient_shares(self):
-        """
-        Verifies a sell larger than the owned position is rejected with
-        a clear error and no commit.
-        """
-
-        fake_connection = FakeConnection(fetchone_results=[{"quantity": 1.5}])
-
-        with patch("main.get_connection", return_value=fake_connection), patch(
-            "main.get_stock_price", return_value=120.0
+    def test_sell_portfolio_translates_domain_error_to_400(self):
+        with patch(
+            "main.services.sell_holding",
+            side_effect=InsufficientSharesError("Insufficient shares: you only own 1.5000 shares of AAPL."),
         ):
-            with self.assertRaises(HTTPException) as ctx:
-                main.sell_portfolio(main.SellRequest(ticker="AAPL", quantity=5))
+            response = client.post("/portfolio/sell", json={"ticker": "AAPL", "quantity": 5})
 
-        self.assertEqual(ctx.exception.status_code, 400)
-        self.assertIn("Insufficient shares", ctx.exception.detail)
-        self.assertFalse(fake_connection.committed)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Insufficient shares", response.json()["detail"])
 
-    def test_get_trending_returns_mover_list(self):
-        """
-        Verifies the trending endpoint passes through the movers list
-        from the Yahoo screener.
-        """
+    def test_get_portfolio_performance_returns_service_data(self):
+        fake_performance = {"holdings": [], "summary": {"totalValue": 0.0}}
 
-        fake_movers = [
-            {"ticker": "AAPL", "name": "Apple Inc.", "price": 308.91, "changePercent": -7.35},
-            {"ticker": "NVDA", "name": "NVIDIA Corporation", "price": 200.75, "changePercent": 2.93},
-        ]
+        with patch("main.services.get_performance", return_value=fake_performance):
+            response = client.get("/portfolio/performance")
 
-        with patch("main.get_trending_tickers", return_value=fake_movers):
-            response = main.get_trending()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), fake_performance)
 
-        self.assertEqual(response, fake_movers)
 
+class MarketDataRouteTests(unittest.TestCase):
+    def test_get_price_success(self):
+        with patch("main.services.lookup_price", return_value={"ticker": "AAPL", "price": 308.91}):
+            response = client.get("/stocks/price/AAPL")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ticker": "AAPL", "price": 308.91})
+
+    def test_get_price_translates_not_found_to_404(self):
+        with patch("main.services.lookup_price", side_effect=TickerNotFoundError("'ZZZZZ' doesn't look like a valid, tradeable ticker.")):
+            response = client.get("/stocks/price/ZZZZZ")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_trending_returns_service_data(self):
+        fake_movers = [{"ticker": "AAPL", "name": "Apple Inc.", "price": 308.91, "changePercent": -7.35}]
+
+        with patch("main.services.trending", return_value=fake_movers):
+            response = client.get("/stocks/trending")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), fake_movers)
+
+    def test_search_stocks_requires_query_param(self):
+        response = client.get("/stocks/search")
+        self.assertEqual(response.status_code, 422)
+
+
+class BalanceRouteTests(unittest.TestCase):
     def test_get_balance_returns_cash(self):
-        """
-        Verifies the balance endpoint returns the current cash amount.
-        """
+        with patch("main.services.get_balance", return_value=2500.0):
+            response = client.get("/balance")
 
-        fake_connection = FakeConnection(fetchone_results=[{"cash": 2500.0}])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"cash": 2500.0})
 
-        with patch("main.get_connection", return_value=fake_connection):
-            response = main.get_balance()
+    def test_get_balance_translates_uninitialized_error_to_500(self):
+        with patch(
+            "main.services.get_balance",
+            side_effect=BalanceNotInitializedError("Balance not initialized. Run 'python db_conn.py' to set up the balance table."),
+        ):
+            response = client.get("/balance")
 
-        self.assertEqual(response, {"cash": 2500.0})
+        self.assertEqual(response.status_code, 500)
 
-    def test_get_balance_uninitialized_raises_clear_error(self):
-        """
-        Verifies a missing balance row (table not seeded) raises a
-        descriptive 500 instead of a raw KeyError/None crash.
-        """
+    def test_deposit_rejects_non_positive_amount(self):
+        with patch("main.services.deposit") as mock_deposit:
+            response = client.post("/balance/deposit", json={"amount": 0})
 
-        fake_connection = FakeConnection(fetchone_results=[None])
+        self.assertEqual(response.status_code, 422)
+        mock_deposit.assert_not_called()
 
-        with patch("main.get_connection", return_value=fake_connection):
-            with self.assertRaises(HTTPException) as ctx:
-                main.get_balance()
+    def test_withdraw_translates_domain_error_to_400(self):
+        with patch(
+            "main.services.withdraw",
+            side_effect=InsufficientFundsError("Cannot withdraw $500.00: your balance is only $100.00."),
+        ):
+            response = client.post("/balance/withdraw", json={"amount": 500})
 
-        self.assertEqual(ctx.exception.status_code, 500)
-        self.assertIn("not initialized", ctx.exception.detail)
-
-    def test_deposit_funds_adds_to_balance(self):
-        """
-        Verifies a deposit increases the cash balance by the given amount.
-        """
-
-        fake_connection = FakeConnection(fetchone_results=[{"cash": 1000.0}])
-
-        with patch("main.get_connection", return_value=fake_connection):
-            response = main.deposit_funds(main.DepositRequest(amount=500.0))
-
-        self.assertEqual(response, {"message": "Deposited $500.00", "cash": 1500.0})
-        self.assertTrue(fake_connection.committed)
-
-    def test_withdraw_funds_subtracts_from_balance(self):
-        """
-        Verifies a withdrawal decreases the cash balance by the given amount.
-        """
-
-        fake_connection = FakeConnection(fetchone_results=[{"cash": 1000.0}])
-
-        with patch("main.get_connection", return_value=fake_connection):
-            response = main.withdraw_funds(main.WithdrawRequest(amount=500.0))
-
-        self.assertEqual(response, {"message": "Withdrew $500.00", "cash": 500.0})
-        self.assertTrue(fake_connection.committed)
-
-    def test_withdraw_funds_rejects_amount_exceeding_balance(self):
-        """
-        Verifies a withdrawal larger than the balance is rejected with a
-        clear 400 and the balance is left unchanged.
-        """
-
-        fake_connection = FakeConnection(fetchone_results=[{"cash": 100.0}])
-
-        with patch("main.get_connection", return_value=fake_connection):
-            with self.assertRaises(HTTPException) as ctx:
-                main.withdraw_funds(main.WithdrawRequest(amount=500.0))
-
-        self.assertEqual(ctx.exception.status_code, 400)
-        self.assertIn("Cannot withdraw", ctx.exception.detail)
-        self.assertFalse(fake_connection.committed)
-        self.assertTrue(fake_connection.rolled_back)
-
-    def test_withdraw_funds_allows_exact_balance(self):
-        """
-        Verifies withdrawing exactly the full balance is allowed and
-        leaves the balance at zero, not negative.
-        """
-
-        fake_connection = FakeConnection(fetchone_results=[{"cash": 250.0}])
-
-        with patch("main.get_connection", return_value=fake_connection):
-            response = main.withdraw_funds(main.WithdrawRequest(amount=250.0))
-
-        self.assertEqual(response, {"message": "Withdrew $250.00", "cash": 0.0})
+        self.assertEqual(response.status_code, 400)
 
 
 if __name__ == "__main__":

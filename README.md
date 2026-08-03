@@ -39,12 +39,18 @@ A full-stack portfolio management application built as a training project. It le
 
 ## Project Structure
 
+The backend follows a Web → Service → Persistence layering:
+
 ```
-main.py                    FastAPI app: all REST endpoints
+main.py                    Web layer: FastAPI routes, request schemas, HTTP error translation
+services.py                Service layer: business rules (balance checks, share checks, cost-basis aggregation)
+persistence.py             Persistence layer: raw SQL only, no business logic
+errors.py                  Domain error types shared by the service and web layers
 db_conn.py                 MySQL connection + table setup/migrations
 math_logic.py               Pure performance/gain calculation functions
 yahoo_service.py           Live price lookup + asset search via yfinance
-tests/                     Backend unit tests
+tests/                     Backend tests: unit (test_services.py, test_persistence.py, test_math_logic.py)
+                            + integration (test_main.py, via FastAPI's TestClient)
 frontend/
   app.py                   Flask app serving the UI
   templates/                HTML pages (Jinja2)
