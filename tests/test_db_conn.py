@@ -47,7 +47,14 @@ class DbConnTests(unittest.TestCase):
         fake_conn = mock_connect.return_value
         fake_cursor = fake_conn.cursor.return_value
 
-        db_conn.create_table()
+        with patch.dict("os.environ", {
+            "DB_HOST": "127.0.0.1",
+            "DB_PORT": "3306",
+            "DB_USER": "pm_user",
+            "DB_PASS": "secret",
+            "DB_NAME": "portfolio_db",
+        }, clear=False):
+            db_conn.create_table()
 
         fake_cursor.execute.assert_called_once()
         sql = fake_cursor.execute.call_args[0][0]
