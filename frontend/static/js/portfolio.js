@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         transactionsPanel.classList.toggle("hidden", tabName !== "transactions");
 
         if (searchInput) {
-            searchInput.style.display = tabName === "holdings" ? "" : "none";
+            searchInput.style.display = "";
         }
     }
 
@@ -188,7 +188,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         await submitSellOrder(ticker, quantityToSell);
     }
 
-    function applyHoldingsFilter() {
+    function applyPortfolioFilter() {
         if (!searchInput) {
             return;
         }
@@ -196,6 +196,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         const query = searchInput.value.trim().toLowerCase();
 
         holdingsContainer.querySelectorAll("tbody tr").forEach((row) => {
+            row.style.display = row.dataset.ticker.includes(query) ? "" : "none";
+        });
+
+        transactionsContainer.querySelectorAll("tbody tr").forEach((row) => {
             row.style.display = row.dataset.ticker.includes(query) ? "" : "none";
         });
     }
@@ -254,7 +258,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             button.addEventListener("click", handleSellClick);
         });
 
-        applyHoldingsFilter();
+        applyPortfolioFilter();
     }
 
     function renderTransactionsTable() {
@@ -283,7 +287,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         ${transactions
                             .map(
                                 (transaction) => `
-                                    <tr>
+                                    <tr data-ticker="${transaction.ticker.toLowerCase()}">
                                         <td>${transaction.purchaseDate}</td>
                                         <td><strong>${transaction.ticker}</strong></td>
                                         <td>${String(transaction.side || "buy").toUpperCase()}</td>
@@ -373,7 +377,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     if (searchInput) {
-        searchInput.addEventListener("input", applyHoldingsFilter);
+        searchInput.addEventListener("input", applyPortfolioFilter);
     }
 
     try {
