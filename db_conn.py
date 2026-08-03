@@ -41,6 +41,7 @@ def create_table():
             id INT AUTO_INCREMENT PRIMARY KEY,
             ticker VARCHAR(10) NOT NULL,
             type ENUM('stock', 'etf', 'bond', 'cash') NOT NULL,
+            side ENUM('buy', 'sell') NOT NULL DEFAULT 'buy',
             quantity DECIMAL(10,4) NOT NULL,
             purchasePrice DECIMAL(10,2) NOT NULL,
             purchaseDate DATE NOT NULL
@@ -57,8 +58,8 @@ def create_table():
 
 def update_existing_table():
     """
-    Updates an existing portfolio table to support ETF holdings.
-    Run this once if the table already exists.
+    Updates an existing portfolio table to support ETF holdings and
+    transaction sides.
     """
 
     conn = get_connection()
@@ -68,6 +69,14 @@ def update_existing_table():
         ALTER TABLE portfolio
         MODIFY type ENUM('stock', 'etf', 'bond', 'cash') NOT NULL
     """)
+
+    cursor.execute("SHOW COLUMNS FROM portfolio LIKE 'side'")
+    if cursor.fetchone() is None:
+        cursor.execute("""
+            ALTER TABLE portfolio
+            ADD COLUMN side ENUM('buy', 'sell') NOT NULL DEFAULT 'buy'
+            AFTER purchaseDate
+        """)
 
     conn.commit()
 

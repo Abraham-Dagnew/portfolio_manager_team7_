@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getPortfolio } from '../static/js/api.js';
+import { getPortfolio, getHoldings } from '../static/js/api.js';
 
 const originalFetch = global.fetch;
 
@@ -25,13 +25,26 @@ test('getPortfolio calls the portfolio endpoint', async () => {
   let calledUrl;
   mockFetch((url) => {
     calledUrl = url;
-    return mockResponse({ jsonData: [{ id: 1, ticker: 'AAPL' }] });
+    return mockResponse({ jsonData: [{ id: 1, ticker: 'AAPL', side: 'buy' }] });
   });
 
   const result = await getPortfolio();
 
   assert.equal(calledUrl, 'http://127.0.0.1:8000/portfolio');
-  assert.deepEqual(result, [{ id: 1, ticker: 'AAPL' }]);
+  assert.deepEqual(result, [{ id: 1, ticker: 'AAPL', side: 'buy' }]);
+});
+
+test('getHoldings calls the holdings endpoint', async () => {
+  let calledUrl;
+  mockFetch((url) => {
+    calledUrl = url;
+    return mockResponse({ jsonData: [{ ticker: 'AAPL', averagePrice: 100, currentPrice: 120, quantity: 2 }] });
+  });
+
+  const result = await getHoldings();
+
+  assert.equal(calledUrl, 'http://127.0.0.1:8000/portfolio/holdings');
+  assert.deepEqual(result, [{ ticker: 'AAPL', averagePrice: 100, currentPrice: 120, quantity: 2 }]);
 });
 
 test('getPortfolio throws a friendly error when the API fails', async () => {

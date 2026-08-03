@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { addHolding, deleteHolding } from '../static/js/api.js';
+import { addHolding, sellHolding } from '../static/js/api.js';
 
 const originalFetch = global.fetch;
 
@@ -45,18 +45,21 @@ test('addHolding posts holding data as JSON', async () => {
   assert.deepEqual(result, { message: 'Holding added', id: 7 });
 });
 
-test('deleteHolding calls DELETE on the holding id', async () => {
+test('sellHolding posts sale data to the sell endpoint', async () => {
   let calledUrl;
   let requestOptions;
   mockFetch((url, options) => {
     calledUrl = url;
     requestOptions = options;
-    return mockResponse({ jsonData: { message: 'Holding deleted' } });
+    return mockResponse({ jsonData: { message: 'Sold AAPL' } });
   });
 
-  const result = await deleteHolding(8);
+  const payload = { ticker: 'AAPL', quantity: 5 };
+  const result = await sellHolding(payload);
 
-  assert.equal(calledUrl, 'http://127.0.0.1:8000/portfolio/8');
-  assert.equal(requestOptions.method, 'DELETE');
-  assert.deepEqual(result, { message: 'Holding deleted' });
+  assert.equal(calledUrl, 'http://127.0.0.1:8000/portfolio/sell');
+  assert.equal(requestOptions.method, 'POST');
+  assert.equal(requestOptions.headers['Content-Type'], 'application/json');
+  assert.deepEqual(JSON.parse(requestOptions.body), payload);
+  assert.deepEqual(result, { message: 'Sold AAPL' });
 });

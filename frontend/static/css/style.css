@@ -220,6 +220,132 @@ body {
     padding:2rem;
 }
 
+.portfolio-tabs {
+    display:flex;
+    gap:.5rem;
+    margin:1rem 0 1.5rem;
+}
+
+.tab-button {
+    border:1px solid var(--border);
+    background:white;
+    color:var(--text);
+    border-radius:999px;
+    padding:.65rem 1.1rem;
+    font-weight:600;
+    cursor:pointer;
+}
+
+.tab-button.active {
+    background:linear-gradient(135deg,var(--navy),var(--navy-dark));
+    border-color:transparent;
+    color:white;
+}
+
+.tab-panel.hidden {
+    display:none;
+}
+
+.table-responsive {
+    overflow-x:auto;
+}
+
+.sell-btn {
+    border:none;
+    border-radius:6px;
+    padding:.5rem .8rem;
+    font-weight:600;
+    color:white;
+    background:var(--red);
+    cursor:pointer;
+}
+
+.sell-btn:hover:not(:disabled) {
+    background:#b91c1c;
+}
+
+.sell-btn:disabled {
+    opacity:.7;
+    cursor:not-allowed;
+}
+
+.sell-modal {
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+}
+
+.sell-modal.hidden {
+    display:none;
+}
+
+.sell-modal__backdrop {
+    position:absolute;
+    inset:0;
+    background:rgba(5,38,71,.45);
+}
+
+.sell-modal__dialog {
+    position:relative;
+    z-index:1;
+    width:min(92vw, 420px);
+    background:white;
+    border-radius:16px;
+    padding:1.5rem;
+    box-shadow:0 24px 60px rgba(0,0,0,.25);
+}
+
+.sell-modal__message {
+    margin:.25rem 0 1rem;
+    color:var(--text-muted);
+}
+
+.sell-modal__label {
+    display:block;
+    margin-bottom:.4rem;
+    font-weight:600;
+}
+
+.sell-modal__dialog input {
+    width:100%;
+    padding:.7rem .85rem;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-size:1rem;
+}
+
+.sell-modal__actions {
+    display:flex;
+    gap:.75rem;
+    justify-content:flex-end;
+    margin-top:1.25rem;
+}
+
+.sell-modal__button {
+    border:none;
+    border-radius:8px;
+    padding:.7rem 1rem;
+    font-weight:600;
+    cursor:pointer;
+}
+
+.sell-modal__button--secondary {
+    background:#e5e7eb;
+    color:var(--text);
+}
+
+.sell-modal__button--primary {
+    background:var(--red);
+    color:white;
+}
+
+.sell-modal__button--primary:hover {
+    background:#b91c1c;
+}
+
 
 
 /* =========================

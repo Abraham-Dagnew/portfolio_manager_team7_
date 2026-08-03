@@ -92,12 +92,40 @@ class PortfolioApiTests(unittest.TestCase):
         Verifies portfolio rows are returned from the mocked database.
         """
 
-        fake_connection = FakeConnection(rows=[{"id": 1, "ticker": "AAPL"}])
+        fake_connection = FakeConnection(rows=[{"id": 1, "ticker": "AAPL", "side": "buy"}])
 
         with patch("main.get_connection", return_value=fake_connection):
             response = main.get_portfolio()
 
-        self.assertEqual(response, [{"id": 1, "ticker": "AAPL"}])
+        self.assertEqual(response, [{"id": 1, "ticker": "AAPL", "side": "buy"}])
+
+    def test_get_portfolio_holdings_aggregates_transactions(self):
+        """
+        Verifies raw transactions are aggregated into one holding per ticker.
+        """
+
+        fake_connection = FakeConnection(
+            rows=[
+                {"id": 1, "ticker": "AAPL", "side": "buy", "quantity": 10, "purchasePrice": 100.0, "purchaseDate": "2026-07-20"},
+                {"id": 2, "ticker": "AAPL", "side": "buy", "quantity": 5, "purchasePrice": 120.0, "purchaseDate": "2026-07-21"},
+                {"id": 3, "ticker": "AAPL", "side": "sell", "quantity": 3, "purchasePrice": 130.0, "purchaseDate": "2026-07-22"},
+                {"id": 4, "ticker": "MSFT", "side": "buy", "quantity": 2, "purchasePrice": 200.0, "purchaseDate": "2026-07-22"},
+            ]
+        )
+
+        with patch("main.get_connection", return_value=fake_connection), patch(
+            "main.get_multiple_prices",
+            return_value={"AAPL": 150.0, "MSFT": 250.0},
+        ):
+            response = main.get_portfolio_holdings()
+
+        self.assertEqual(
+            response,
+            [
+                {"ticker": "AAPL", "averagePrice": 106.67, "quantity": 12.0, "currentPrice": 150.0},
+                {"ticker": "MSFT", "averagePrice": 200.0, "quantity": 2.0, "currentPrice": 250.0},
+            ],
+        )
 
     def test_post_portfolio_inserts_and_returns_id(self):
         """
@@ -178,42 +206,47 @@ class PortfolioApiTests(unittest.TestCase):
         self.assertEqual(response["summary"]["totalValue"], 2400.0)
         self.assertEqual(response["summary"]["totalGain"], 400.0)
 
-    def test_delete_portfolio_returns_message(self):
+    def test_sell_portfolio_records_sale_and_updates_balance(self):
         """
-        Verifies deleting a holding returns the confirmation message and
-        refunds its cost basis to the cash balance.
+        Verifies selling shares records a new sell transaction and
+        credits the cash balance at the live market price.
         """
 
         fake_connection = FakeConnection(
             fetchone_results=[
-                {"quantity": 10, "purchasePrice": 100.0},
+                {"quantity": 10.0},
+                {"type": "stock"},
                 {"cash": 500.0},
             ]
         )
 
-        with patch("main.get_connection", return_value=fake_connection):
-            response = main.delete_portfolio(4)
+        with patch("main.get_connection", return_value=fake_connection), patch(
+            "main.get_stock_price", return_value=120.0
+        ):
+            response = main.sell_portfolio(main.SellRequest(ticker="aapl", quantity=3))
 
         self.assertEqual(
             response,
-            {"message": "Holding 4 deleted", "refunded": 1000.0, "remainingBalance": 1500.0},
+            {"message": "Sold 3.0 shares of AAPL", "soldValue": 360.0, "remainingBalance": 860.0},
         )
         self.assertTrue(fake_connection.committed)
 
-    def test_delete_portfolio_not_found(self):
+    def test_sell_portfolio_rejects_insufficient_shares(self):
         """
-        Verifies deleting a non-existent holding returns a clear 404
-        instead of a silent no-op.
+        Verifies a sell larger than the owned position is rejected with
+        a clear error and no commit.
         """
 
-        fake_connection = FakeConnection(fetchone_results=[None])
+        fake_connection = FakeConnection(fetchone_results=[{"quantity": 1.5}])
 
-        with patch("main.get_connection", return_value=fake_connection):
+        with patch("main.get_connection", return_value=fake_connection), patch(
+            "main.get_stock_price", return_value=120.0
+        ):
             with self.assertRaises(HTTPException) as ctx:
-                main.delete_portfolio(999)
+                main.sell_portfolio(main.SellRequest(ticker="AAPL", quantity=5))
 
-        self.assertEqual(ctx.exception.status_code, 404)
-        self.assertIn("999", ctx.exception.detail)
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("Insufficient shares", ctx.exception.detail)
         self.assertFalse(fake_connection.committed)
 
     def test_get_trending_returns_mover_list(self):

@@ -3,11 +3,28 @@
 {% block title %}Browse Holdings - Portfolio Manager{% endblock %}
 
 {% block content %}
-<h2>Your Transactions</h2>
 
-<div id="holdings-container">
-    <p>Loading portfolio...</p>
+<div class="page-heading">
+    <h1>Holdings Dashboard</h1>
+    <p>Track your current positions and review every transaction.</p>
 </div>
+
+<div class="portfolio-tabs" role="tablist" aria-label="Portfolio views">
+    <button class="tab-button active" type="button" data-tab="holdings" aria-selected="true">Holdings</button>
+    <button class="tab-button" type="button" data-tab="transactions" aria-selected="false">Transactions</button>
+</div>
+
+<section id="holdings-panel" class="tab-panel">
+    <div id="holdings-container">
+        <p>Loading holdings...</p>
+    </div>
+</section>
+
+<section id="transactions-panel" class="tab-panel hidden">
+    <div id="transactions-container">
+        <p>Loading transactions...</p>
+    </div>
+</section>
 
 <!-- Update JS link here -->
 <script type="module" src="/static/js/portfolio.js"></script>
