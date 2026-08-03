@@ -115,15 +115,21 @@ python -m unittest discover tests -v
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/portfolio` | List all holdings |
+| GET | `/portfolio` | List the raw buy/sell transaction history |
 | POST | `/portfolio` | Buy a new holding (validates ticker, funds, etc.) |
-| DELETE | `/portfolio/{id}` | Delete a holding and refund its cost |
+| GET | `/portfolio/holdings` | One aggregated holding per ticker (net quantity, average cost) |
+| POST | `/portfolio/sell` | Sell shares of an existing holding at the live market price |
 | GET | `/portfolio/performance` | Holdings enriched with live prices + portfolio summary |
 | GET | `/stocks/search?q=` | Search real tickers/companies (stocks, ETFs, bonds) |
 | GET | `/stocks/price/{ticker}` | Look up a ticker's live price |
+| GET | `/stocks/trending` | Currently most-active real tickers, for the Buy page's popular tickers widget |
 | GET | `/balance` | Get current cash balance |
 | POST | `/balance/deposit` | Add funds to the balance |
 | POST | `/balance/withdraw` | Remove funds from the balance (can't go below $0) |
+
+### Idempotency
+
+`POST /portfolio`, `POST /portfolio/sell`, `POST /balance/deposit`, and `POST /balance/withdraw` accept an optional `Idempotency-Key` header. If a client doesn't receive a response to one of these requests (e.g. a dropped connection) and retries with the **same** key, the original result is replayed instead of the operation running again — so a retried "buy 100 shares" never buys them twice. The frontend generates a fresh key automatically per request.
 
 
 

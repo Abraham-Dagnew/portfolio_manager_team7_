@@ -207,5 +207,73 @@ class BalanceRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+class IdempotencyRouteTests(unittest.TestCase):
+    """
+    Verifies the Idempotency-Key header actually prevents a repeated
+    POST /portfolio from buying shares twice, at the real HTTP layer.
+    """
+
+    def test_repeated_request_with_same_key_only_buys_once(self):
+        fake_response = {"message": "Holding added", "id": 7, "remainingBalance": 3497.5}
+        payload = {
+            "ticker": "AAPL",
+            "type": "stock",
+            "quantity": 10,
+            "purchasePrice": 150.25,
+            "purchaseDate": "2026-01-15",
+        }
+
+        # In-memory fake for the idempotency_keys table: no real DB needed.
+        stored = {}
+
+        class FakeCursor:
+            def execute(self, query, params=None):
+                self.last_query, self.last_params = query, params
+
+            def fetchone(self):
+                if "SELECT status_code" in self.last_query:
+                    return stored.get((self.last_params[0], self.last_params[1]))
+                return None
+
+        from contextlib import contextmanager
+
+        @contextmanager
+        def fake_transaction():
+            yield FakeCursor()
+
+        def fake_store(cursor, key, endpoint, status_code, body):
+            import json
+
+            stored.setdefault((key, endpoint), {"status_code": status_code, "response_body": json.dumps(body)})
+
+        with patch("main.services.buy_holding", return_value=fake_response) as mock_buy, patch(
+            "idempotency.persistence.transaction", fake_transaction
+        ), patch("idempotency.persistence.store_idempotent_response", side_effect=fake_store):
+            first = client.post("/portfolio", json=payload, headers={"Idempotency-Key": "retry-key-1"})
+            second = client.post("/portfolio", json=payload, headers={"Idempotency-Key": "retry-key-1"})
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.json(), fake_response)
+        self.assertEqual(second.json(), fake_response)
+        mock_buy.assert_called_once()
+
+    def test_request_without_key_runs_every_time(self):
+        fake_response = {"message": "Holding added", "id": 7, "remainingBalance": 3497.5}
+        payload = {
+            "ticker": "AAPL",
+            "type": "stock",
+            "quantity": 10,
+            "purchasePrice": 150.25,
+            "purchaseDate": "2026-01-15",
+        }
+
+        with patch("main.services.buy_holding", return_value=fake_response) as mock_buy:
+            client.post("/portfolio", json=payload)
+            client.post("/portfolio", json=payload)
+
+        self.assertEqual(mock_buy.call_count, 2)
+
+
 if __name__ == "__main__":
     unittest.main()
