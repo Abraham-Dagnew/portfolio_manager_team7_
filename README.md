@@ -42,17 +42,21 @@ A full-stack portfolio management application built as a training project. It le
 The backend follows a Web → Service → Persistence layering:
 
 ```
-main.py                    Web layer: FastAPI routes, request schemas, HTTP error translation
-services.py                Service layer: business rules (balance checks, share checks, cost-basis aggregation)
-persistence.py             Persistence layer: raw SQL only, no business logic
-errors.py                  Domain error types shared by the service and web layers
-db_conn.py                 MySQL connection + table setup/migrations
-math_logic.py               Pure performance/gain calculation functions
-yahoo_service.py           Live price lookup + asset search via yfinance
-tests/                     Backend tests: unit (test_services.py, test_persistence.py, test_math_logic.py)
+backend/
+  main.py                  Web layer: FastAPI routes, request schemas, HTTP error translation
+  services.py              Service layer: business rules (balance checks, share checks, cost-basis aggregation)
+  persistence.py           Persistence layer: raw SQL only, no business logic
+  errors.py                Domain error types shared by the service and web layers
+  db_conn.py               MySQL connection + table setup/migrations
+  math_logic.py             Pure performance/gain calculation functions
+  yahoo_service.py         Live price lookup + asset search via yfinance
+  requirements.txt          Backend dependencies
+  .env / .env.example       MySQL credentials (create .env from the example, gitignored)
+  tests/                    Backend tests: unit (test_services.py, test_persistence.py, test_math_logic.py)
                             + integration (test_main.py, via FastAPI's TestClient)
 frontend/
   app.py                   Flask app serving the UI
+  requirements.txt          Frontend dependencies
   templates/                HTML pages (Jinja2)
   static/js/                API client, page logic, formatting helpers
   static/css/                Styling
@@ -64,17 +68,18 @@ frontend/
 ### 1. Install dependencies
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install -r backend\requirements.txt
 python -m pip install -r frontend\requirements.txt
 ```
 
 ### 2. Configure your database
 
-Copy `.env.example` to `.env` and fill in your local MySQL credentials.
+Copy `backend\.env.example` to `backend\.env` and fill in your local MySQL credentials.
 
 ### 3. Create the database tables
 
 ```powershell
+cd backend
 python db_conn.py
 ```
 This creates the `portfolio` table and seeds a `balance` table with a starting cash balance of $10,000.
@@ -82,6 +87,7 @@ This creates the `portfolio` table and seeds a `balance` table with a starting c
 ### 4. Start the backend
 
 ```powershell
+cd backend
 python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -101,6 +107,7 @@ Interactive Swagger docs are available at `http://127.0.0.1:8000/docs`.
 ## Running Tests
 
 ```powershell
+cd backend
 python -m unittest discover tests -v
 ```
 
