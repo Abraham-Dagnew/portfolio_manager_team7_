@@ -42,6 +42,15 @@ export async function getPortfolio() {
     return await response.json();
 }
 
+// GET /portfolio/holdings
+export async function getHoldings() {
+    const response = await fetch(`${API_BASE_URL}/portfolio/holdings`);
+    if (!response.ok) {
+        throw new Error(await extractErrorMessage(response, "Failed to fetch holdings"));
+    }
+    return await response.json();
+}
+
 // POST /portfolio (Person C)
 export async function addHolding(holdingData) {
     const response = await fetch(`${API_BASE_URL}/portfolio`, {
@@ -57,13 +66,17 @@ export async function addHolding(holdingData) {
     return await response.json();
 }
 
-// DELETE /portfolio/{id} (Person C)
-export async function deleteHolding(holdingId) {
-    const response = await fetch(`${API_BASE_URL}/portfolio/${holdingId}`, {
-        method: "DELETE"
+// POST /portfolio/sell
+export async function sellHolding(saleData) {
+    const response = await fetch(`${API_BASE_URL}/portfolio/sell`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(saleData)
     });
     if (!response.ok) {
-        throw new Error(await extractErrorMessage(response, "Failed to delete holding"));
+        throw new Error(await extractErrorMessage(response, "Failed to sell holding"));
     }
     return await response.json();
 }

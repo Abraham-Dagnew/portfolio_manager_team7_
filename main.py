@@ -4,6 +4,7 @@ FastAPI application for the portfolio manager backend.
 
 from enum import Enum
 from datetime import date
+from collections import defaultdict
 from fastapi import FastAPI, HTTPException, Query
 import uvicorn
 from db_conn import get_connection
@@ -76,6 +77,114 @@ class WithdrawRequest(BaseModel):
     amount: float = Field(..., gt=0, description="Withdrawal amount must be greater than zero")
 
 
+class SellRequest(BaseModel):
+    """
+    Request body for selling shares from an existing holding.
+    """
+
+    ticker: str
+    quantity: float = Field(..., gt=0, description="Quantity must be greater than zero")
+
+    @field_validator("ticker")
+    @classmethod
+    def validate_ticker(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not v.isalpha() or not (1 <= len(v) <= 5):
+            raise ValueError("Ticker must be 1-5 alphabetic characters")
+        return v
+
+
+def normalize_ticker(ticker: str) -> str:
+    return ticker.strip().upper()
+
+
+def get_portfolio_rows(cursor):
+    cursor.execute("SELECT * FROM portfolio ORDER BY purchaseDate ASC, id ASC")
+    return cursor.fetchall()
+
+
+def build_holdings_snapshot(rows):
+    grouped = defaultdict(
+        lambda: {
+            "buyQuantity": 0.0,
+            "sellQuantity": 0.0,
+            "buyValue": 0.0,
+        }
+    )
+
+    for row in rows:
+        ticker = normalize_ticker(row["ticker"])
+        side = (row.get("side") or "buy").lower()
+        quantity = float(row["quantity"])
+        purchase_price = float(row["purchasePrice"])
+
+        bucket = grouped[ticker]
+        if side == "sell":
+            bucket["sellQuantity"] += quantity
+        else:
+            bucket["buyQuantity"] += quantity
+            bucket["buyValue"] += quantity * purchase_price
+
+    holdings = []
+    for ticker, bucket in grouped.items():
+        net_quantity = round(bucket["buyQuantity"] - bucket["sellQuantity"], 4)
+        if net_quantity <= 0:
+            continue
+
+        average_price = round(bucket["buyValue"] / bucket["buyQuantity"], 2) if bucket["buyQuantity"] else 0.0
+        holdings.append(
+            {
+                "ticker": ticker,
+                "averagePrice": average_price,
+                "quantity": net_quantity,
+            }
+        )
+
+    holdings.sort(key=lambda item: item["ticker"])
+
+    if holdings:
+        prices = get_multiple_prices([holding["ticker"] for holding in holdings])
+        for holding in holdings:
+            holding["currentPrice"] = prices.get(holding["ticker"], 0.0)
+    else:
+        prices = {}
+
+    return holdings
+
+
+def get_net_quantity_for_ticker(cursor, ticker: str) -> float:
+    cursor.execute(
+        """
+        SELECT COALESCE(SUM(CASE WHEN side = 'buy' THEN quantity ELSE -quantity END), 0) AS quantity
+        FROM portfolio
+        WHERE ticker = %s
+    """,
+        (ticker,),
+    )
+    row = cursor.fetchone()
+    return float(row["quantity"] if row and row["quantity"] is not None else 0.0)
+
+
+def get_buy_type_for_ticker(cursor, ticker: str):
+    cursor.execute(
+        """
+        SELECT type
+        FROM portfolio
+        WHERE ticker = %s AND side = 'buy'
+        ORDER BY purchaseDate ASC, id ASC
+        LIMIT 1
+    """,
+        (ticker,),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No buy transactions found for {ticker}.",
+        )
+    return row["type"]
+
+
 def get_current_balance(cursor) -> float:
     """
     Reads the single-row cash balance. Raises a 500 with a clear message
@@ -104,16 +213,16 @@ def root():
 @app.get("/portfolio")
 def get_portfolio():
     """
-    Returns all portfolio rows from the database.
+    Returns the raw transaction history from the database.
     """
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM portfolio")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return rows
+    try:
+        return get_portfolio_rows(cursor)
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.get("/health")
@@ -123,6 +232,22 @@ def health_check():
     """
 
     return {"status": "ok"}
+
+
+@app.get("/portfolio/holdings")
+def get_portfolio_holdings():
+    """
+    Returns one aggregated holding per ticker.
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        rows = get_portfolio_rows(cursor)
+        return build_holdings_snapshot(rows)
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.get("/stocks/search")
@@ -278,8 +403,8 @@ def post_portfolio(holding: HoldingCreate):
 
         cursor.execute(
             """
-            INSERT INTO portfolio (ticker, type, quantity, purchasePrice, purchaseDate)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO portfolio (ticker, type, side, quantity, purchasePrice, purchaseDate)
+            VALUES (%s, %s, 'buy', %s, %s, %s)
         """,
             (
                 holding.ticker,
@@ -308,35 +433,53 @@ def post_portfolio(holding: HoldingCreate):
     return {"message": "Holding added", "id": new_id, "remainingBalance": new_balance}
 
 
-@app.delete("/portfolio/{holding_id}")
-def delete_portfolio(holding_id: int):
+@app.post("/portfolio/sell")
+def sell_portfolio(sale: SellRequest):
     """
-    Deletes a holding from the portfolio table by id and refunds its
-    original cost basis (quantity * purchasePrice) back to the cash
-    balance, since there's no separate "sell" action yet - deleting a
-    holding is treated as undoing the purchase.
+    Records a sell transaction, verifies the user owns enough shares,
+    and credits the cash balance with the current market value.
     """
+
+    clean_ticker = normalize_ticker(sale.ticker)
+    current_price = get_stock_price(clean_ticker)
+    if current_price <= 0.0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{clean_ticker}' doesn't look like a valid, tradeable ticker. Please double-check it.",
+        )
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute(
-            "SELECT quantity, purchasePrice FROM portfolio WHERE id = %s",
-            (holding_id,),
-        )
-        holding = cursor.fetchone()
-        if holding is None:
+        owned_quantity = get_net_quantity_for_ticker(cursor, clean_ticker)
+        if sale.quantity > owned_quantity:
             raise HTTPException(
-                status_code=404,
-                detail=f"No holding found with id {holding_id}.",
+                status_code=400,
+                detail=(
+                    f"Insufficient shares: you only own {owned_quantity:.4f} shares of {clean_ticker}."
+                ),
             )
 
-        refund = round(float(holding["quantity"]) * float(holding["purchasePrice"]), 2)
+        holding_type = get_buy_type_for_ticker(cursor, clean_ticker)
+        sale_value = round(float(sale.quantity) * float(current_price), 2)
+        sold_date = date.today().isoformat()
 
-        cursor.execute("DELETE FROM portfolio WHERE id = %s", (holding_id,))
+        cursor.execute(
+            """
+            INSERT INTO portfolio (ticker, type, side, quantity, purchasePrice, purchaseDate)
+            VALUES (%s, %s, 'sell', %s, %s, %s)
+        """,
+            (
+                clean_ticker,
+                holding_type,
+                sale.quantity,
+                current_price,
+                sold_date,
+            ),
+        )
 
         current_balance = get_current_balance(cursor)
-        new_balance = round(current_balance + refund, 2)
+        new_balance = round(current_balance + sale_value, 2)
         cursor.execute("UPDATE balance SET cash = %s WHERE id = 1", (new_balance,))
 
         conn.commit()
@@ -351,8 +494,8 @@ def delete_portfolio(holding_id: int):
         conn.close()
 
     return {
-        "message": f"Holding {holding_id} deleted",
-        "refunded": refund,
+        "message": f"Sold {sale.quantity:.1f} shares of {clean_ticker}",
+        "soldValue": sale_value,
         "remainingBalance": new_balance,
     }
 
@@ -366,33 +509,35 @@ def get_portfolio_performance():
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM portfolio")
-    holdings = cursor.fetchall()
-    cursor.close()
-    conn.close()
-
-    prices = get_multiple_prices([holding["ticker"] for holding in holdings])
+    try:
+        holdings = build_holdings_snapshot(get_portfolio_rows(cursor))
+    finally:
+        cursor.close()
+        conn.close()
 
     enriched_holdings = []
     for holding in holdings:
-        current_price = prices.get(holding["ticker"].strip().upper(), 0.0)
         performance = calculate_holding_performance(
             quantity=holding["quantity"],
-            purchase_price=holding["purchasePrice"],
-            current_price=current_price,
+            purchase_price=holding["averagePrice"],
+            current_price=holding["currentPrice"],
         )
         enriched_holdings.append(
-            {**holding, "currentPrice": current_price, **performance}
+            {
+                **holding,
+                "purchasePrice": holding["averagePrice"],
+                **performance,
+            }
         )
 
     summary = calculate_portfolio_performance(
         [
             {
                 "quantity": holding["quantity"],
-                "purchasePrice": holding["purchasePrice"],
+                "purchasePrice": holding["averagePrice"],
                 "currentPrice": holding["currentPrice"],
             }
-            for holding in enriched_holdings
+            for holding in holdings
         ]
     )
 

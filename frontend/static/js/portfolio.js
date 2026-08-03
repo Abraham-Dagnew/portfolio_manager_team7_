@@ -1,267 +1,399 @@
-import { getPortfolio, deleteHolding, getStockPrice } from './api.js';
+import { getPortfolio, getHoldings, getStockPrice, sellHolding } from './api.js';
 import { showToast } from './toast.js';
 import { refreshBalance } from './balance.js';
 import { formatCurrency, formatNumber } from './format.js';
 
 document.addEventListener("DOMContentLoaded", async () => {
+    const holdingsContainer = document.getElementById("holdings-container");
+    const transactionsContainer = document.getElementById("transactions-container");
+    const holdingsPanel = document.getElementById("holdings-panel");
+    const transactionsPanel = document.getElementById("transactions-panel");
+    const searchInput = document.querySelector(".topbar-search");
+    const tabButtons = Array.from(document.querySelectorAll(".tab-button"));
+    let sellModal = null;
+    let sellModalInput = null;
+    let sellModalMessage = null;
+    let sellModalConfirmButton = null;
+    let sellModalTicker = null;
+    let sellModalMaxQuantity = 0;
+    let sellModalLivePrice = null;
+    let sellModalAveragePrice = null;
 
-    const container = document.getElementById("holdings-container");
-
-    // Prevent crash if JS loads on another page
-    if (!container) {
-        console.error("holdings-container not found");
+    if (!holdingsContainer || !transactionsContainer || !holdingsPanel || !transactionsPanel) {
         return;
     }
 
-    try {
+    let holdings = [];
+    let transactions = [];
+    let activeTab = "holdings";
 
-        const holdings = await getPortfolio();
+    function setActiveTab(tabName) {
+        activeTab = tabName;
 
-        if (!holdings || holdings.length === 0) {
+        tabButtons.forEach((button) => {
+            const isActive = button.dataset.tab === tabName;
+            button.classList.toggle("active", isActive);
+            button.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
 
-            container.innerHTML = `
-                <div class="empty-state card p-4 text-center">
-                    <h3>No holdings found</h3>
-                    <p class="text-muted mb-0">
-                        Click "Buy" to start building your portfolio.
-                    </p>
-                </div>
-            `;
+        holdingsPanel.classList.toggle("hidden", tabName !== "holdings");
+        transactionsPanel.classList.toggle("hidden", tabName !== "transactions");
 
+        if (searchInput) {
+            searchInput.style.display = tabName === "holdings" ? "" : "none";
+        }
+    }
+
+    function renderEmptyState(container, title, message) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <h3>${title}</h3>
+                <p>${message}</p>
+            </div>
+        `;
+    }
+
+    function ensureSellModal() {
+        if (sellModal) {
             return;
         }
 
-
-        let html = `
-            <div class="card shadow-sm border-0">
-                <div class="table-responsive">
-
-                    <table class="table align-middle mb-0">
-
-                        <thead>
-                            <tr>
-                                <th>Ticker</th>
-                                <th>Type</th>
-                                <th>Quantity</th>
-                                <th>Purchase Price</th>
-                                <th>Purchase Date</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-        `;
-
-
-        holdings.forEach(item => {
-
-            html += `
-                <tr data-ticker="${item.ticker.toLowerCase()}">
-
-                    <td>
-                        <strong>${item.ticker}</strong>
-                    </td>
-
-                    <td>
-                        <span class="badge bg-light text-dark">
-                            ${item.type}
-                        </span>
-                    </td>
-
-                    <td>${formatNumber(item.quantity)}</td>
-
-                    <td>
-                        ${formatCurrency(item.purchasePrice)}
-                    </td>
-
-                    <td>
-                        ${item.purchaseDate}
-                    </td>
-
-                    <td>
-
-                        <button
-                            class="sell-btn btn btn-sm btn-outline-danger"
-                            data-id="${item.id}"
-                            data-ticker="${item.ticker}"
-                            data-type="${item.type}"
-                            data-quantity="${item.quantity}"
-                            data-price="${item.purchasePrice}">
-                            Sell
-                        </button>
-
-                    </td>
-
-                </tr>
-            `;
-
-        });
-
-
-        html += `
-                        </tbody>
-
-                    </table>
-
+        sellModal = document.createElement("div");
+        sellModal.className = "sell-modal hidden";
+        sellModal.innerHTML = `
+            <div class="sell-modal__backdrop" data-action="close"></div>
+            <div class="sell-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="sell-modal-title">
+                <h3 id="sell-modal-title">Sell shares</h3>
+                <p class="sell-modal__message"></p>
+                <label class="sell-modal__label" for="sellModalQuantity">Quantity to sell</label>
+                <input id="sellModalQuantity" type="number" min="0.0001" step="0.01">
+                <div class="sell-modal__actions">
+                    <button type="button" class="sell-modal__button sell-modal__button--secondary" data-action="cancel">Cancel</button>
+                    <button type="button" class="sell-modal__button sell-modal__button--primary" data-action="confirm">Sell</button>
                 </div>
             </div>
         `;
 
+        document.body.appendChild(sellModal);
+        sellModalInput = sellModal.querySelector("#sellModalQuantity");
+        sellModalMessage = sellModal.querySelector(".sell-modal__message");
+        sellModalConfirmButton = sellModal.querySelector('[data-action="confirm"]');
 
-        container.innerHTML = html;
+        sellModal.addEventListener("click", (event) => {
+            const action = event.target?.dataset?.action;
+            if (action === "close" || action === "cancel") {
+                closeSellModal();
+            }
+            if (action === "confirm") {
+                confirmSellModal();
+            }
+        });
 
+        sellModalInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                confirmSellModal();
+            }
+        });
 
+        sellModalInput.addEventListener("input", renderSellModalDetails);
+    }
 
-        // SELL FUNCTIONALITY WITH GAIN/LOSS PREVIEW
-
-        document.querySelectorAll(".sell-btn")
-            .forEach(button => {
-
-                button.addEventListener("click", async (e) => {
-
-                    const id = e.target.dataset.id;
-                    const ticker = e.target.dataset.ticker;
-                    const type = e.target.dataset.type;
-                    const quantity = parseFloat(e.target.dataset.quantity) || 0;
-                    const purchasePrice = parseFloat(e.target.dataset.price) || 0;
-                    const row = e.target.closest("tr");
-
-                    e.target.disabled = true;
-                    e.target.textContent = "Checking price...";
-
-                    let confirmMsg = `Are you sure you want to sell ${quantity} share(s) of ${ticker}?`;
-
-                    // If it's a stock/ETF, fetch live market price to compute gain/loss
-                    if (type !== "Cash") {
-                        try {
-                            const market = await getStockPrice(ticker);
-                            const currentPrice = market.price;
-                            const totalCost = purchasePrice * quantity;
-                            const currentValue = currentPrice * quantity;
-                            const profitLoss = currentValue - totalCost;
-
-                            const profitLossFormatted = formatCurrency(Math.abs(profitLoss));
-                            const sign = profitLoss >= 0 ? "+" : "-";
-                            const status = profitLoss >= 0 ? "GAIN" : "LOSS";
-
-                            confirmMsg = `Selling ${quantity} share(s) of ${ticker}:\n` +
-                                `- Purchase Price: ${formatCurrency(purchasePrice)}\n` +
-                                `- Current Market Price: ${formatCurrency(currentPrice)}\n` +
-                                `- Estimated Realized ${status}: ${sign}${profitLossFormatted}\n\n` +
-                                `Are you sure you want to proceed?`;
-                        } catch (err) {
-                            // Fallback if price API fails or ticker is missing
-                            confirmMsg = `Are you sure you want to sell ${quantity} share(s) of ${ticker}?`;
-                        }
-                    }
-
-                    e.target.textContent = "Sell";
-                    e.target.disabled = false;
-
-                    if (!confirm(confirmMsg)) {
-                        return;
-                    }
-
-                    e.target.disabled = true;
-                    e.target.textContent = "Selling...";
-
-                    try {
-
-                        await deleteHolding(id);
-
-                        row.remove();
-
-                        showToast(
-                            `Sold ${ticker} successfully!`,
-                            "success"
-                        );
-
-                        refreshBalance();
-
-                        const remaining =
-                            document.querySelectorAll(
-                                "#holdings-container tbody tr"
-                            );
-
-                        if (remaining.length === 0) {
-                            container.innerHTML = `
-                                <div class="empty-state card p-4 text-center">
-                                    <h3>No holdings found</h3>
-                                    <p class="text-muted mb-0">
-                                        Click "Buy" to start building your portfolio.
-                                    </p>
-                                </div>
-                            `;
-                        }
-
-                    } catch(error) {
-
-                        showToast(
-                            error.message || "Failed to sell holding",
-                            "error"
-                        );
-
-                        e.target.disabled = false;
-                        e.target.textContent = "Sell";
-
-                    }
-
-                });
-
-            });
-
-
-
-        // SEARCH FUNCTIONALITY
-
-        const searchInput =
-            document.querySelector(".topbar-search");
-
-
-        if (searchInput) {
-
-            searchInput.addEventListener("input", () => {
-
-                const query =
-                    searchInput.value
-                    .trim()
-                    .toLowerCase();
-
-                document
-                    .querySelectorAll(
-                        "#holdings-container tbody tr"
-                    )
-                    .forEach(row => {
-
-                        const ticker =
-                            row.dataset.ticker;
-
-                        row.style.display =
-                            ticker.includes(query)
-                            ? ""
-                            : "none";
-
-                    });
-
-            });
-
+    function renderSellModalDetails() {
+        if (!sellModalMessage || !sellModalInput || sellModalLivePrice === null || sellModalAveragePrice === null) {
+            return;
         }
 
-    } catch(error) {
+        const quantityToSell = Number(String(sellModalInput.value).replace(/,/g, "").trim()) || 0;
+        const estimatedProceeds = quantityToSell * sellModalLivePrice;
+        const estimatedGainLoss = (sellModalLivePrice - sellModalAveragePrice) * quantityToSell;
+        const gainLossLabel = estimatedGainLoss >= 0 ? "Estimated gain" : "Estimated loss";
 
-        console.error(error);
+        sellModalMessage.innerHTML = `
+            Live sell price: <strong>${formatCurrency(sellModalLivePrice)}</strong><br>
+            Average buy price: <strong>${formatCurrency(sellModalAveragePrice)}</strong><br>
+            Estimated proceeds: <strong>${formatCurrency(estimatedProceeds)}</strong><br>
+            ${gainLossLabel}: <strong>${formatCurrency(Math.abs(estimatedGainLoss))}</strong><br>
+            Maximum available: <strong>${formatNumber(sellModalMaxQuantity)} shares</strong>
+        `;
+    }
 
-        container.innerHTML = `
-            <div class="alert alert-danger">
-                <h5>
-                    Unable to Load Portfolio
-                </h5>
-                <p>
-                    ${error.message}
-                </p>
+    async function openSellModal(ticker, quantity, averagePrice) {
+        ensureSellModal();
+        sellModalTicker = ticker;
+        sellModalMaxQuantity = Number(quantity);
+        sellModalAveragePrice = Number(averagePrice);
+        sellModalLivePrice = null;
+        sellModalInput.value = String(quantity);
+        sellModalInput.max = String(quantity);
+        sellModalInput.disabled = true;
+        if (sellModalConfirmButton) {
+            sellModalConfirmButton.disabled = true;
+        }
+        sellModalMessage.innerHTML = `Loading live price for ${ticker}...`;
+        sellModal.classList.remove("hidden");
+        window.setTimeout(() => sellModalInput.focus(), 0);
+
+        try {
+            const market = await getStockPrice(ticker);
+            sellModalLivePrice = Number(market.price);
+            renderSellModalDetails();
+        } catch (error) {
+            sellModalLivePrice = 0;
+            sellModalMessage.textContent = error.message || `Could not load a live price for ${ticker}.`;
+            showToast(error.message || `Could not load a live price for ${ticker}.`, "error");
+        } finally {
+            sellModalInput.disabled = false;
+            if (sellModalConfirmButton) {
+                sellModalConfirmButton.disabled = false;
+            }
+            sellModalInput.focus();
+        }
+    }
+
+    function closeSellModal() {
+        if (!sellModal) {
+            return;
+        }
+
+        sellModal.classList.add("hidden");
+        sellModalTicker = null;
+        sellModalMaxQuantity = 0;
+        sellModalLivePrice = null;
+        sellModalAveragePrice = null;
+    }
+
+    async function confirmSellModal() {
+        if (!sellModalTicker) {
+            return;
+        }
+
+        const quantityToSell = Number(String(sellModalInput.value).replace(/,/g, "").trim());
+
+        if (!Number.isFinite(quantityToSell) || quantityToSell <= 0) {
+            showToast("Enter a valid quantity greater than zero.", "error");
+            return;
+        }
+
+        if (quantityToSell > sellModalMaxQuantity) {
+            showToast(
+                `You only own ${formatNumber(sellModalMaxQuantity)} shares of ${sellModalTicker}.`,
+                "error"
+            );
+            return;
+        }
+
+        const ticker = sellModalTicker;
+        closeSellModal();
+        await submitSellOrder(ticker, quantityToSell);
+    }
+
+    function applyHoldingsFilter() {
+        if (!searchInput) {
+            return;
+        }
+
+        const query = searchInput.value.trim().toLowerCase();
+
+        holdingsContainer.querySelectorAll("tbody tr").forEach((row) => {
+            row.style.display = row.dataset.ticker.includes(query) ? "" : "none";
+        });
+    }
+
+    function renderHoldingsTable() {
+        if (!holdings.length) {
+            renderEmptyState(
+                holdingsContainer,
+                "No holdings yet",
+                'Buy an asset to see your current positions here.'
+            );
+            return;
+        }
+
+        holdingsContainer.innerHTML = `
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Average Price</th>
+                            <th>Current Price</th>
+                            <th>Quantity</th>
+                            <th>Sell</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${holdings
+                            .map(
+                                (holding) => `
+                                    <tr data-ticker="${holding.ticker.toLowerCase()}">
+                                        <td><strong>${holding.ticker}</strong></td>
+                                        <td>${formatCurrency(holding.averagePrice)}</td>
+                                        <td>${formatCurrency(holding.currentPrice)}</td>
+                                        <td>${formatNumber(holding.quantity)}</td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="sell-btn"
+                                                data-ticker="${holding.ticker}"
+                                                data-quantity="${holding.quantity}"
+                                            >
+                                                Sell
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `
+                            )
+                            .join("")}
+                    </tbody>
+                </table>
             </div>
         `;
 
+        holdingsContainer.querySelectorAll(".sell-btn").forEach((button) => {
+            button.addEventListener("click", handleSellClick);
+        });
+
+        applyHoldingsFilter();
     }
 
+    function renderTransactionsTable() {
+        if (!transactions.length) {
+            renderEmptyState(
+                transactionsContainer,
+                "No transactions yet",
+                'Every buy and sell will appear here once you start trading.'
+            );
+            return;
+        }
+
+        transactionsContainer.innerHTML = `
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Ticker</th>
+                            <th>Side</th>
+                            <th>Price</th>
+                            <th>Quantity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${transactions
+                            .map(
+                                (transaction) => `
+                                    <tr>
+                                        <td>${transaction.purchaseDate}</td>
+                                        <td><strong>${transaction.ticker}</strong></td>
+                                        <td>${String(transaction.side || "buy").toUpperCase()}</td>
+                                        <td>${formatCurrency(transaction.purchasePrice)}</td>
+                                        <td>${formatNumber(transaction.quantity)}</td>
+                                    </tr>
+                                `
+                            )
+                            .join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    async function loadPortfolioData() {
+        const [holdingsData, transactionsData] = await Promise.all([
+            getHoldings(),
+            getPortfolio(),
+        ]);
+
+        holdings = Array.isArray(holdingsData) ? holdingsData : [];
+        transactions = Array.isArray(transactionsData) ? transactionsData : [];
+
+        renderHoldingsTable();
+        renderTransactionsTable();
+    }
+
+    async function refreshAllViews() {
+        await loadPortfolioData();
+        await refreshBalance();
+    }
+
+    async function submitSellOrder(ticker, quantityToSell) {
+        const button = holdingsContainer.querySelector(`.sell-btn[data-ticker="${ticker}"]`);
+        const currentHolding = holdings.find((holding) => holding.ticker === ticker);
+
+        if (!currentHolding) {
+            showToast(`Could not find ${ticker} in your holdings.`, "error");
+            return;
+        }
+
+        if (quantityToSell > Number(currentHolding.quantity)) {
+            showToast(`You only own ${formatNumber(currentHolding.quantity)} shares of ${ticker}.`, "error");
+            return;
+        }
+
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Selling...";
+        }
+
+        try {
+            const result = await sellHolding({ ticker, quantity: quantityToSell });
+            showToast(result.message || `Sold ${ticker} successfully.`, "success");
+            if (searchInput) {
+                searchInput.value = "";
+            }
+            await refreshAllViews();
+        } catch (error) {
+            showToast(error.message || "Failed to sell holding.", "error");
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = "Sell";
+            }
+        }
+    }
+
+    async function handleSellClick(event) {
+        const button = event.currentTarget;
+        const ticker = button.dataset.ticker;
+        const currentHolding = holdings.find((holding) => holding.ticker === ticker);
+
+        if (!currentHolding) {
+            showToast(`Could not find ${ticker} in your holdings.`, "error");
+            return;
+        }
+
+        openSellModal(ticker, currentHolding.quantity, currentHolding.averagePrice);
+    }
+
+    tabButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            setActiveTab(button.dataset.tab);
+        });
+    });
+
+    if (searchInput) {
+        searchInput.addEventListener("input", applyHoldingsFilter);
+    }
+
+    try {
+        await refreshAllViews();
+        setActiveTab("holdings");
+    } catch (error) {
+        console.error(error);
+
+        const message = error.message || "Unable to load portfolio data.";
+        holdingsContainer.innerHTML = `
+            <div class="empty-state">
+                <h3>Unable to load holdings</h3>
+                <p>${message}</p>
+            </div>
+        `;
+        transactionsContainer.innerHTML = `
+            <div class="empty-state">
+                <h3>Unable to load transactions</h3>
+                <p>${message}</p>
+            </div>
+        `;
+    }
 });
