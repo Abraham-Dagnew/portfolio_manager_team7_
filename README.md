@@ -134,4 +134,5 @@ python -m unittest discover tests -v
 
 
 ### Architecture
-<img width="920" height="752" alt="image" src="https://github.com/user-attachments/assets/6476a62d-3eba-4a34-93ce-9dcde800d1c7" />
+<img width="774" height="751" alt="Screenshot 2026-08-04 at 11 40 55 AM" src="https://github.com/user-attachments/assets/e948023f-e399-4e1f-8086-0e062c8c4bda" />
+
