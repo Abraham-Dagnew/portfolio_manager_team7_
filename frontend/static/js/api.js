@@ -52,11 +52,17 @@ export async function getHoldings() {
 }
 
 // POST /portfolio (Person C)
-export async function addHolding(holdingData) {
+// Sends a fresh Idempotency-Key per purchase attempt. If this exact
+// request needs to be retried (e.g. the connection drops before a
+// response arrives), retry it with the SAME key returned here instead
+// of calling addHolding() again - the backend will replay the
+// original result instead of buying the shares a second time.
+export async function addHolding(holdingData, idempotencyKey = crypto.randomUUID()) {
     const response = await fetch(`${API_BASE_URL}/portfolio`, {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey
         },
         body: JSON.stringify(holdingData)
     });
@@ -67,11 +73,12 @@ export async function addHolding(holdingData) {
 }
 
 // POST /portfolio/sell
-export async function sellHolding(saleData) {
+export async function sellHolding(saleData, idempotencyKey = crypto.randomUUID()) {
     const response = await fetch(`${API_BASE_URL}/portfolio/sell`, {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey
         },
         body: JSON.stringify(saleData)
     });
@@ -102,11 +109,12 @@ export async function getBalance() {
 }
 
 // POST /balance/deposit
-export async function depositFunds(amount) {
+export async function depositFunds(amount, idempotencyKey = crypto.randomUUID()) {
     const response = await fetch(`${API_BASE_URL}/balance/deposit`, {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey
         },
         body: JSON.stringify({ amount })
     });
@@ -117,11 +125,12 @@ export async function depositFunds(amount) {
 }
 
 // POST /balance/withdraw
-export async function withdrawFunds(amount) {
+export async function withdrawFunds(amount, idempotencyKey = crypto.randomUUID()) {
     const response = await fetch(`${API_BASE_URL}/balance/withdraw`, {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey
         },
         body: JSON.stringify({ amount })
     });

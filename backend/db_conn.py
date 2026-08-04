@@ -120,9 +120,42 @@ def create_balance_table():
     print("Balance table ready.")
 
 
+def create_idempotency_table():
+    """
+    Creates the `idempotency_keys` table if it doesn't already exist.
+
+    Stores the response of a mutating request (buy, sell, deposit,
+    withdraw) keyed by the client-supplied Idempotency-Key header, so a
+    retried request (e.g. after a dropped connection) replays the
+    original result instead of executing the operation again.
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS idempotency_keys (
+            idempotency_key VARCHAR(64) NOT NULL,
+            endpoint VARCHAR(50) NOT NULL,
+            status_code INT NOT NULL,
+            response_body TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (idempotency_key, endpoint)
+        )
+    """)
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    print("Idempotency keys table ready.")
+
+
 if __name__ == "__main__":
 
     create_table()
     update_existing_table()
     create_balance_table()
+    create_idempotency_table()
 

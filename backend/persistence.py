@@ -8,6 +8,7 @@ composed by the service layer inside a single `transaction()` block,
 so they commit or roll back together.
 """
 
+import json
 from contextlib import contextmanager
 
 from db_conn import get_connection
@@ -97,3 +98,31 @@ def insert_sell(cursor, ticker: str, asset_type: str, quantity: float, price: fl
         (ticker, asset_type, quantity, price, sold_date),
     )
     return cursor.lastrowid
+
+
+def fetch_idempotent_response(cursor, key: str, endpoint: str) -> dict | None:
+    cursor.execute(
+        "SELECT status_code, response_body FROM idempotency_keys WHERE idempotency_key = %s AND endpoint = %s",
+        (key, endpoint),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    return {"status_code": row["status_code"], "body": json.loads(row["response_body"])}
+
+
+def store_idempotent_response(cursor, key: str, endpoint: str, status_code: int, body: dict) -> None:
+    """
+    Uses INSERT IGNORE so that two identical requests racing each other
+    both try to store, but only the first one wins - the composite
+    primary key (idempotency_key, endpoint) makes the second a no-op
+    instead of an error.
+    """
+
+    cursor.execute(
+        """
+        INSERT IGNORE INTO idempotency_keys (idempotency_key, endpoint, status_code, response_body)
+        VALUES (%s, %s, %s, %s)
+    """,
+        (key, endpoint, status_code, json.dumps(body)),
+    )

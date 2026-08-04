@@ -83,6 +83,27 @@ class PersistenceTests(unittest.TestCase):
         self.assertIn("'sell'", sql)
         self.assertEqual(params, ("AAPL", "stock", 5, 200.0, "2026-02-01"))
 
+    def test_fetch_idempotent_response_returns_none_when_missing(self):
+        cursor = FakeCursor(fetchone_result=None)
+
+        self.assertIsNone(persistence.fetch_idempotent_response(cursor, "key-1", "POST /portfolio"))
+
+    def test_fetch_idempotent_response_parses_stored_json(self):
+        cursor = FakeCursor(fetchone_result={"status_code": 200, "response_body": '{"id": 7}'})
+
+        result = persistence.fetch_idempotent_response(cursor, "key-1", "POST /portfolio")
+
+        self.assertEqual(result, {"status_code": 200, "body": {"id": 7}})
+
+    def test_store_idempotent_response_uses_insert_ignore(self):
+        cursor = FakeCursor()
+
+        persistence.store_idempotent_response(cursor, "key-1", "POST /portfolio", 200, {"id": 7})
+
+        sql, params = cursor.executed[0]
+        self.assertIn("INSERT IGNORE INTO idempotency_keys", sql)
+        self.assertEqual(params, ("key-1", "POST /portfolio", 200, '{"id": 7}'))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,13 +10,14 @@ from datetime import date
 from enum import Enum
 
 import uvicorn
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Header, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 import services
 from errors import DomainError
+from idempotency import run_idempotent
 
 app = FastAPI(title="Portfolio Manager API", version="1.0.0")
 
@@ -190,50 +191,80 @@ def get_balance():
 
 
 @app.post("/balance/deposit")
-def deposit_funds(deposit: DepositRequest):
+def deposit_funds(
+    deposit: DepositRequest,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
     """
     Adds funds to the cash balance. This is the only way the balance
     increases, since the app has no income/paycheck modeling.
+
+    Accepts an optional Idempotency-Key header: if a client resends
+    the same request (e.g. after not receiving a response), the
+    original result is replayed instead of depositing the funds twice.
     """
 
-    return services.deposit(deposit.amount)
+    return run_idempotent(idempotency_key, "POST /balance/deposit", lambda: services.deposit(deposit.amount))
 
 
 @app.post("/balance/withdraw")
-def withdraw_funds(withdrawal: WithdrawRequest):
+def withdraw_funds(
+    withdrawal: WithdrawRequest,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
     """
     Removes funds from the cash balance. Rejected if it would take the
-    balance below zero.
+    balance below zero. Supports the same Idempotency-Key retry safety
+    as deposits.
     """
 
-    return services.withdraw(withdrawal.amount)
+    return run_idempotent(idempotency_key, "POST /balance/withdraw", lambda: services.withdraw(withdrawal.amount))
 
 
 @app.post("/portfolio")
-def post_portfolio(holding: HoldingCreate):
+def post_portfolio(
+    holding: HoldingCreate,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
     """
     Buys a new holding. Rejects the request if the ticker doesn't
     resolve to a real, tradeable price, or if the purchase would
     exceed the available cash balance.
+
+    Accepts an optional Idempotency-Key header: if a client doesn't
+    receive a response (e.g. the connection drops) and resends the
+    exact same request with the same key, the original purchase is
+    returned instead of being executed a second time.
     """
 
-    return services.buy_holding(
-        ticker=holding.ticker,
-        asset_type=holding.type.value,
-        quantity=holding.quantity,
-        purchase_price=holding.purchasePrice,
-        purchase_date=holding.purchaseDate.strftime("%Y-%m-%d"),
-    )
+    def _buy():
+        return services.buy_holding(
+            ticker=holding.ticker,
+            asset_type=holding.type.value,
+            quantity=holding.quantity,
+            purchase_price=holding.purchasePrice,
+            purchase_date=holding.purchaseDate.strftime("%Y-%m-%d"),
+        )
+
+    return run_idempotent(idempotency_key, "POST /portfolio", _buy)
 
 
 @app.post("/portfolio/sell")
-def sell_portfolio(sale: SellRequest):
+def sell_portfolio(
+    sale: SellRequest,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
     """
     Records a sell transaction, verifies the user owns enough shares,
     and credits the cash balance with the current market value.
+    Supports the same Idempotency-Key retry safety as buying.
     """
 
-    return services.sell_holding(ticker=sale.ticker, quantity=sale.quantity)
+    return run_idempotent(
+        idempotency_key,
+        "POST /portfolio/sell",
+        lambda: services.sell_holding(ticker=sale.ticker, quantity=sale.quantity),
+    )
 
 
 @app.get("/portfolio/performance")

@@ -53,3 +53,15 @@ class BalanceNotInitializedError(DomainError):
     """Raised when the balance table hasn't been seeded (db_conn.py wasn't run)."""
 
     status_code = 500
+
+
+class ReplayedError(DomainError):
+    """
+    Raised when an idempotency key matches a previous request that
+    failed. Replays the original error's status code and message
+    verbatim, instead of re-running the operation.
+    """
+
+    def __init__(self, message: str, status_code: int):
+        self.status_code = status_code
+        super().__init__(message)
