@@ -2,12 +2,62 @@
     --navy: #012B51;
     --navy-dark: #052647;
     --bg: #EFF9FF;
+    --surface: #FFFFFF;
+    --surface-alt: #F8F9FA;
     --border: #B0C1D1;
     --text: #052647;
     --text-muted: #4C6478;
     --green: #16a34a;
     --red: #dc2626;
     --card-radius: 12px;
+}
+
+[data-theme="dark"] {
+    --navy: #3b82f6;
+    --navy-dark: #2563eb;
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-alt: #273449;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --green: #22c55e;
+    --red: #f87171;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        --navy: #3b82f6;
+        --navy-dark: #2563eb;
+        --bg: #0f172a;
+        --surface: #1e293b;
+        --surface-alt: #273449;
+        --border: #334155;
+        --text: #e2e8f0;
+        --text-muted: #94a3b8;
+        --green: #22c55e;
+        --red: #f87171;
+    }
+}
+
+.theme-switch {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+.theme-switch button {
+    padding: .4rem .55rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+}
+.theme-switch button.active {
+    border-color: var(--navy);
+    box-shadow: 0 0 0 2px rgba(1,43,81,.15);
 }
 
 * {
@@ -36,7 +86,7 @@ body {
 .sidebar {
     width: 240px;
     flex-shrink: 0;
-    background: white;
+    background: var(--surface);
     border-right: 1px solid var(--border);
     padding: 1.5rem 1rem;
 }
@@ -165,6 +215,8 @@ body {
     padding:.4rem;
     border:1px solid var(--border);
     border-radius:6px;
+    background:var(--surface);
+    color:var(--text);
 }
 
 
@@ -194,7 +246,7 @@ body {
     display:flex;
     align-items:center;
     gap:1.5rem;
-    background:white;
+    background:var(--surface);
     border-bottom:1px solid var(--border);
     padding:1rem 2rem;
 }
@@ -211,6 +263,8 @@ body {
     padding:.5rem;
     border:1px solid var(--border);
     border-radius:8px;
+    background:var(--surface);
+    color:var(--text);
 }
 
 
@@ -228,7 +282,7 @@ body {
 
 .tab-button {
     border:1px solid var(--border);
-    background:white;
+    background:var(--surface);
     color:var(--text);
     border-radius:999px;
     padding:.65rem 1.1rem;
@@ -292,7 +346,7 @@ body {
     position:relative;
     z-index:1;
     width:min(92vw, 420px);
-    background:white;
+    background:var(--surface);
     border-radius:16px;
     padding:1.5rem;
     box-shadow:0 24px 60px rgba(0,0,0,.25);
@@ -315,6 +369,8 @@ body {
     border:1px solid var(--border);
     border-radius:8px;
     font-size:1rem;
+    background:var(--surface);
+    color:var(--text);
 }
 
 .sell-modal__actions {
@@ -357,7 +413,7 @@ body {
 .chart-card,
 .table-card {
 
-    background:white;
+    background:var(--surface);
     border:1px solid var(--border);
     border-radius:var(--card-radius);
     padding:1.25rem;
@@ -368,20 +424,20 @@ body {
 table {
     width:100%;
     border-collapse:collapse;
-    background:white;
+    background:var(--surface);
 }
 
 
 th,
 td {
     padding:12px 15px;
-    border-bottom:1px solid #ddd;
+    border-bottom:1px solid var(--border);
     text-align:left;
 }
 
 
 th {
-    background:#f8f9fa;
+    background:var(--surface-alt);
 }
 
 
@@ -391,7 +447,7 @@ th {
     border:1.5px solid var(--red);
     border-radius:6px;
 
-    background:white;
+    background:var(--surface);
     color:var(--red);
 
     font-weight:700;
@@ -425,7 +481,7 @@ th {
 
     border-color:#f1a3a3;
     color:#f1a3a3;
-    background:white;
+    background:var(--surface);
     cursor:not-allowed;
     box-shadow:none;
 
@@ -529,7 +585,7 @@ th {
     max-width:550px;
     width:100%;
     margin:0;
-    background:white;
+    background:var(--surface);
     padding:35px;
     border-radius:14px;
     box-shadow:0 8px 25px rgba(0,0,0,.08);
@@ -541,7 +597,7 @@ th {
 
     width:280px;
     flex-shrink:0;
-    background:white;
+    background:var(--surface);
     padding:20px;
     border-radius:14px;
     box-shadow:0 8px 25px rgba(0,0,0,.08);
@@ -564,7 +620,7 @@ th {
     align-items:center;
     gap:10px;
     padding:8px 0;
-    border-bottom:1px solid #f1f5f9;
+    border-bottom:1px solid var(--border);
     cursor:pointer;
 
 }
@@ -579,7 +635,7 @@ th {
 
 .trending-item:hover {
 
-    background:#f8fafc;
+    background:var(--surface-alt);
 
 }
 
@@ -676,7 +732,7 @@ th {
 label[for="type"] {
 
     font-weight:700;
-    color:#475569;
+    color:var(--text-muted);
 
 }
 
@@ -689,6 +745,8 @@ label[for="type"] {
     border:1px solid var(--border);
     border-radius:8px;
     font-size:15px;
+    background:var(--surface);
+    color:var(--text);
 
 }
 
@@ -735,7 +793,7 @@ label[for="type"] {
     left:0;
     right:0;
 
-    background:white;
+    background:var(--surface);
     border:1px solid var(--border);
     border-radius:8px;
 
@@ -765,7 +823,7 @@ label[for="type"] {
 
     cursor:pointer;
 
-    border-bottom:1px solid #f1f5f9;
+    border-bottom:1px solid var(--border);
 
 }
 
@@ -798,9 +856,9 @@ label[for="type"] {
 input:disabled,
 #purchaseDate {
 
-    background:#f1f5f9;
-    color:#475569;
-    border-color:#cbd5e1;
+    background:var(--surface-alt);
+    color:var(--text-muted);
+    border-color:var(--border);
     cursor:not-allowed;
     font-weight:700;
     user-select:none;
@@ -812,8 +870,8 @@ input:disabled,
 .form-group select {
 
     font-weight:400;
-    color:#111827;
-    background:white;
+    color:var(--text);
+    background:var(--surface);
     cursor:pointer;
 
 }
@@ -822,15 +880,15 @@ input:disabled,
 .form-group select option {
 
     font-weight:400;
-    color:#111827;
+    color:var(--text);
 
 }
 
 #type {
 
-    background:#f1f5f9;
-    color:#475569;
-    border-color:#cbd5e1;
+    background:var(--surface-alt);
+    color:var(--text-muted);
+    border-color:var(--border);
     cursor:not-allowed;
     font-weight:400;
 
@@ -838,7 +896,7 @@ input:disabled,
 
 #type option {
 
-    color:#111827;
+    color:var(--text);
     font-weight:400;
 
 }
@@ -849,7 +907,7 @@ input:disabled,
 #purchaseDate {
 
     font-weight:700;
-    color:#475569;
+    color:var(--text-muted);
 
 }
 
@@ -875,7 +933,7 @@ input:disabled:focus {
 label[for="purchaseDate"] {
 
     font-weight:700;
-    color:#475569;
+    color:var(--text-muted);
 
 }
 
@@ -1002,7 +1060,7 @@ label[for="purchaseDate"] {
 
 
 .card {
-    background:white;
+    background:var(--surface);
     border:1px solid var(--border);
     border-radius:var(--card-radius);
     padding:1.25rem;
@@ -1062,7 +1120,7 @@ label[for="purchaseDate"] {
 
 .chart-card,
 .table-card {
-    background:white;
+    background:var(--surface);
     border:1px solid var(--border);
     border-radius:var(--card-radius);
     padding:1.25rem;
@@ -1084,7 +1142,7 @@ label[for="purchaseDate"] {
 .holdings-table th,
 .holdings-table td {
     padding:.6rem .8rem;
-    border-bottom:1px solid #eee;
+    border-bottom:1px solid var(--border);
 }
 
 
@@ -1145,6 +1203,8 @@ label[for="purchaseDate"] {
     border:1px solid var(--border);
     border-radius:8px;
     font-size:.9rem;
+    background:var(--surface);
+    color:var(--text);
 }
 
 
