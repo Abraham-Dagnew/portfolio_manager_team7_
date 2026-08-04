@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function () {
+            const saved = localStorage.getItem('theme');
+            if (saved === 'light' || saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', saved);
+            }
+        })();
+    </script>
     <title>{% block title %}Portfolio Manager{% endblock %}</title>
     <!-- Update CSS link here -->
     <link rel="stylesheet" href="/static/css/style.css">
@@ -43,6 +51,11 @@
                 {% if active_page == 'portfolio' %}
                 <input class="topbar-search" type="text" placeholder="Search by ticker...">
                 {% endif %}
+                <div class="theme-switch" id="theme-switch">
+                    <button type="button" data-theme-choice="light" title="Light">☀️</button>
+                    <button type="button" data-theme-choice="dark" title="Dark">🌙</button>
+                    <button type="button" data-theme-choice="system" title="System">🖥️</button>
+                </div>
             </header>
 
             <main class="container">
@@ -51,6 +64,7 @@
         </div>
     </div>
     <script type="module" src="/static/js/balance.js"></script>
+    <script src="/static/js/theme.js"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
