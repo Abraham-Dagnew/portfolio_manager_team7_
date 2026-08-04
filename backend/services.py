@@ -252,3 +252,32 @@ def search(query: str) -> list[dict]:
 
 def trending() -> list[dict]:
     return get_trending_tickers()
+
+def reset_database():
+    """
+    Clears all test data.
+    Used only for Playwright E2E testing.
+    """
+
+    from persistence import get_connection
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM portfolio")   # <-- was "transactions"
+
+        cursor.execute("""
+            UPDATE balance
+            SET cash = 10000
+        """)
+
+        conn.commit()
+
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+    finally:
+        cursor.close()
+        conn.close()
