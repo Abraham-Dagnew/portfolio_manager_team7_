@@ -276,6 +276,19 @@ def get_portfolio_performance():
 
     return services.get_performance()
 
+@app.delete("/test/reset")
+def reset_test_data():
+    """
+    Clears all test data.
+    Only available for testing.
+    """
+
+    services.reset_database()
+
+    return {
+        "message": "Test data cleared"
+    }
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
