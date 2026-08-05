@@ -45,7 +45,6 @@ function renderTable(holdings) {
         const row = document.createElement("tr");
         const realizedClass = holding.realizedGain >= 0 ? "gain-positive" : "gain-negative";
         const unrealizedClass = holding.unrealizedGain >= 0 ? "gain-positive" : "gain-negative";
-        const totalClass = holding.totalPL >= 0 ? "gain-positive" : "gain-negative";
 
         row.innerHTML = `
             <td>${holding.ticker}</td>
@@ -55,7 +54,6 @@ function renderTable(holdings) {
             <td>${formatCurrency(holding.totalValue)}</td>
             <td class="${realizedClass}">${formatCurrency(holding.realizedGain)}</td>
             <td class="${unrealizedClass}">${formatCurrency(holding.unrealizedGain)}</td>
-            <td class="${totalClass}">${formatCurrency(holding.totalPL)}</td>
             <td class="${unrealizedClass}">${formatPercent(holding.gainPercent)}</td>
         `;
         tableBodyEl.appendChild(row);
