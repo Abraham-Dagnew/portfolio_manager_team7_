@@ -38,7 +38,8 @@ A full-stack portfolio management application built as a training project. It le
 **Testing**
 - Python `unittest` — unit, integration, and performance/benchmark tests (`backend/tests/`)
 - Node's built-in test runner (`node:test`) — frontend API-client tests (`frontend/tests/`)
-- GitHub Actions — both suites run automatically on every push and pull request (`.github/workflows/tests.yml`)
+- Playwright + pytest — end-to-end tests that drive the real UI in a browser against both live servers (`backend/tests/e2e/`)
+- GitHub Actions — the unit/integration/performance and frontend suites run automatically on every push and pull request (`.github/workflows/tests.yml`). The e2e suite isn't wired into CI yet — it requires both servers running live, so for now it's run manually.
 
 ## Project Structure
 
@@ -59,6 +60,7 @@ backend/
   tests/                    unit (test_services.py, test_persistence.py, test_idempotency.py, test_math_logic.py)
                             + integration (test_main.py, via FastAPI's TestClient)
                             + performance (test_performance.py, benchmark assertions)
+                            + e2e/ (Playwright + pytest, drives the real UI against live servers)
 frontend/
   app.py                   Flask app serving the UI
   requirements.txt          Frontend dependencies
@@ -126,6 +128,30 @@ node --test
 
 Both run automatically in CI (GitHub Actions) on every push and pull request.
 
+### Running the E2E Tests
+
+These drive a real browser against both live servers, so they need extra setup beyond `backend/requirements.txt`:
+
+```powershell
+cd backend
+python -m pip install pytest pytest-playwright
+python -m playwright install
+```
+
+Start both servers first (see **Getting Started**, steps 4–5), then in a third terminal:
+
+```powershell
+cd backend\tests\e2e
+python -m pytest -m e2e
+```
+
+To watch it run in a real, visible browser, slowed down:
+```powershell
+python -m pytest -m e2e --headed --slowmo 1000
+```
+
+⚠️ **This resets your database.** A `clean_database` fixture calls `DELETE /test/reset` before and after every e2e test, which clears the `portfolio` table and resets the cash balance to $10,000 — on whatever database your `.env` points to. There's no separate test database configured, so don't run the e2e suite against data you want to keep.
+
 ## API Reference
 
 | Method | Endpoint | Description |
@@ -141,6 +167,7 @@ Both run automatically in CI (GitHub Actions) on every push and pull request.
 | GET | `/balance` | Get current cash balance |
 | POST | `/balance/deposit` | Add funds to the balance |
 | POST | `/balance/withdraw` | Remove funds from the balance (can't go below $0) |
+| DELETE | `/test/reset` | ⚠️ Test-only. Clears the `portfolio` table and resets the balance to $10,000. Used by the e2e test suite; not meant for normal use. |
 
 ### Idempotency
 
