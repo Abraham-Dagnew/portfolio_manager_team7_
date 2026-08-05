@@ -82,8 +82,8 @@ class TransactionsAndHoldingsTests(unittest.TestCase):
         self.assertEqual(
             result,
             [
-                {"ticker": "AAPL", "averagePrice": 106.67, "quantity": 12.0, "currentPrice": 150.0},
-                {"ticker": "MSFT", "averagePrice": 200.0, "quantity": 2.0, "currentPrice": 250.0},
+                {"ticker": "AAPL", "averagePrice": 106.67, "quantity": 12.0, "realizedGain": 0.0, "currentPrice": 150.0},
+                {"ticker": "MSFT", "averagePrice": 200.0, "quantity": 2.0, "realizedGain": 0.0, "currentPrice": 250.0},
             ],
         )
 
@@ -103,14 +103,32 @@ class TransactionsAndHoldingsTests(unittest.TestCase):
 
         self.assertEqual(
             result,
-            [{"ticker": "INTC", "averagePrice": 90.71, "quantity": 4.0, "currentPrice": 92.0}],
+            [{"ticker": "INTC", "averagePrice": 90.71, "quantity": 4.0, "realizedGain": 0.0, "currentPrice": 92.0}],
+        )
+
+    def test_get_holdings_carries_realized_gain_from_past_sells(self):
+        cursor = FakeCursor(
+            fetchall_result=[
+                {"id": 1, "ticker": "AAPL", "side": "buy", "quantity": 10, "purchasePrice": 100.0, "purchaseDate": "2026-07-20", "realizedGain": None},
+                {"id": 2, "ticker": "AAPL", "side": "sell", "quantity": 4, "purchasePrice": 120.0, "purchaseDate": "2026-07-21", "realizedGain": 80.0},
+            ]
+        )
+
+        with patch("services.persistence.transaction", fake_transaction(cursor)), patch(
+            "services.get_multiple_prices", return_value={"AAPL": 130.0}
+        ):
+            result = services.get_holdings()
+
+        self.assertEqual(
+            result,
+            [{"ticker": "AAPL", "averagePrice": 100.0, "quantity": 6.0, "realizedGain": 80.0, "currentPrice": 130.0}],
         )
 
     def test_get_performance_returns_holdings_and_summary(self):
         cursor = FakeCursor(
             fetchall_result=[
-                {"id": 1, "ticker": "AAPL", "side": "buy", "quantity": 10, "purchasePrice": 100.0, "purchaseDate": "2026-07-20"},
-                {"id": 2, "ticker": "MSFT", "side": "buy", "quantity": 5, "purchasePrice": 200.0, "purchaseDate": "2026-07-21"},
+                {"id": 1, "ticker": "AAPL", "side": "buy", "quantity": 10, "purchasePrice": 100.0, "purchaseDate": "2026-07-20", "realizedGain": None},
+                {"id": 2, "ticker": "MSFT", "side": "buy", "quantity": 5, "purchasePrice": 200.0, "purchaseDate": "2026-07-21", "realizedGain": None},
             ]
         )
 
@@ -122,8 +140,36 @@ class TransactionsAndHoldingsTests(unittest.TestCase):
         self.assertEqual(len(response["holdings"]), 2)
         self.assertEqual(response["holdings"][0]["currentPrice"], 150.0)
         self.assertEqual(response["holdings"][0]["totalGain"], 500.0)
+        self.assertEqual(response["holdings"][0]["unrealizedGain"], 500.0)
+        self.assertEqual(response["holdings"][0]["totalPL"], 500.0)
         self.assertEqual(response["summary"]["totalValue"], 2400.0)
         self.assertEqual(response["summary"]["totalGain"], 400.0)
+        self.assertEqual(response["summary"]["totalRealizedGain"], 0.0)
+        self.assertEqual(response["summary"]["totalUnrealizedGain"], 400.0)
+        self.assertEqual(response["summary"]["totalPL"], 400.0)
+
+    def test_get_performance_includes_realized_gain_from_closed_positions(self):
+        """
+        A fully-closed position (net quantity 0) shouldn't appear in
+        holdings, but its realized gain must still count toward the
+        portfolio-wide total.
+        """
+
+        cursor = FakeCursor(
+            fetchall_result=[
+                {"id": 1, "ticker": "TSLA", "side": "buy", "quantity": 5, "purchasePrice": 200.0, "purchaseDate": "2026-07-20", "realizedGain": None},
+                {"id": 2, "ticker": "TSLA", "side": "sell", "quantity": 5, "purchasePrice": 250.0, "purchaseDate": "2026-07-21", "realizedGain": 250.0},
+            ]
+        )
+
+        with patch("services.persistence.transaction", fake_transaction(cursor)), patch(
+            "services.get_multiple_prices", return_value={}
+        ):
+            response = services.get_performance()
+
+        self.assertEqual(response["holdings"], [])
+        self.assertEqual(response["summary"]["totalRealizedGain"], 250.0)
+        self.assertEqual(response["summary"]["totalPL"], 250.0)
 
 
 class BalanceServiceTests(unittest.TestCase):
@@ -211,13 +257,16 @@ class BuySellServiceTests(unittest.TestCase):
 
     def test_sell_holding_records_sale_and_credits_balance(self):
         cursor = FakeCursor(
+            fetchall_result=[
+                {"side": "buy", "quantity": 10, "purchasePrice": 100.0},
+            ],
             fetchone_results=[
-                {"quantity": 10.0},
                 {"cash": 500.0},
-            ]
+            ],
         )
-        # fetch_net_quantity uses a SUM query (one fetchone), fetch_latest_buy_type
-        # is patched directly below since it isn't cursor-driven in this test.
+        # fetch_ticker_history uses fetchall() to compute owned quantity and
+        # average cost; fetch_latest_buy_type is patched directly below since
+        # it isn't exercised through the fake cursor in this test.
 
         with patch("services.persistence.transaction", fake_transaction(cursor)), patch(
             "services.get_stock_price", return_value=120.0
@@ -226,11 +275,20 @@ class BuySellServiceTests(unittest.TestCase):
 
         self.assertEqual(
             response,
-            {"message": "Sold 3 shares of AAPL", "soldValue": 360.0, "remainingBalance": 860.0},
+            {
+                "message": "Sold 3 shares of AAPL",
+                "soldValue": 360.0,
+                "realizedGain": 60.0,
+                "remainingBalance": 860.0,
+            },
         )
 
     def test_sell_holding_rejects_insufficient_shares(self):
-        cursor = FakeCursor(fetchone_results=[{"quantity": 1.5}])
+        cursor = FakeCursor(
+            fetchall_result=[
+                {"side": "buy", "quantity": 1.5, "purchasePrice": 100.0},
+            ]
+        )
 
         with patch("services.persistence.transaction", fake_transaction(cursor)), patch(
             "services.get_stock_price", return_value=120.0
@@ -247,7 +305,11 @@ class BuySellServiceTests(unittest.TestCase):
                 services.sell_holding("zzzzz", 1)
 
     def test_sell_holding_rejects_ticker_with_no_buy_history(self):
-        cursor = FakeCursor(fetchone_results=[{"quantity": 10.0}])
+        cursor = FakeCursor(
+            fetchall_result=[
+                {"side": "buy", "quantity": 10, "purchasePrice": 100.0},
+            ]
+        )
 
         with patch("services.persistence.transaction", fake_transaction(cursor)), patch(
             "services.get_stock_price", return_value=120.0

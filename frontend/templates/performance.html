@@ -27,18 +27,28 @@
             <span id="summary-total-cost" class="card-value"></span>
         </div>
         <div class="card">
-            <span class="card-icon">&#8599;</span>
-            <span class="card-label">Total Gain</span>
-            <span id="summary-total-gain" class="card-value"></span>
+            <span class="card-icon">&#8597;</span>
+            <span class="card-label">Realized P/L</span>
+            <span id="summary-realized-gain" class="card-value"></span>
+        </div>
+        <div class="card">
+            <span class="card-icon">&#8597;</span>
+            <span class="card-label">Unrealized P/L</span>
+            <span id="summary-unrealized-gain" class="card-value"></span>
+        </div>
+        <div class="card">
+            <span class="card-icon">&#8721;</span>
+            <span class="card-label">Total P/L</span>
+            <span id="summary-total-pl" class="card-value"></span>
         </div>
         <div class="card">
             <span class="card-icon">%</span>
-            <span class="card-label">Gain %</span>
+            <span class="card-label">Unrealized Gain %</span>
             <span id="summary-gain-percent" class="card-value"></span>
         </div>
     </section>
 
-    <section class="analytics-grid">
+    <section id="analytics-grid" class="analytics-grid">
         <div class="chart-card">
             <h2>Gain / Loss by Holding</h2>
             <canvas id="gain-loss-chart"></canvas>
@@ -59,7 +69,9 @@
                     <th>Purchase Price</th>
                     <th>Current Price</th>
                     <th>Total Value</th>
-                    <th>Total Gain</th>
+                    <th>Realized P/L</th>
+                    <th>Unrealized P/L</th>
+                    <th>Total P/L</th>
                     <th>Gain %</th>
                 </tr>
             </thead>

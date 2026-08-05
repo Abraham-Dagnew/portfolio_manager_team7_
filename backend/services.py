@@ -37,38 +37,80 @@ def _require_balance(cursor) -> float:
     return balance
 
 
+def _apply_transaction(bucket: dict, row: dict) -> None:
+    """
+    Applies one buy/sell row to a running (buyQuantity, buyValue)
+    position bucket, in place, using average cost basis. A position
+    that's fully closed (quantity reaches zero) resets its cost basis,
+    so a later buy starts fresh instead of blending with the closed
+    lot. Shared by holdings aggregation (many tickers at once) and the
+    average-cost-basis lookup used when computing realized gain on a
+    sell (a single ticker).
+    """
+
+    side = (row.get("side") or "buy").lower()
+    quantity = float(row["quantity"])
+    purchase_price = float(row["purchasePrice"])
+
+    if side == "sell":
+        if bucket["buyQuantity"] <= 0:
+            return
+
+        sell_quantity = min(quantity, bucket["buyQuantity"])
+        average_cost = bucket["buyValue"] / bucket["buyQuantity"] if bucket["buyQuantity"] else 0.0
+        bucket["buyQuantity"] = round(bucket["buyQuantity"] - sell_quantity, 4)
+        bucket["buyValue"] = round(bucket["buyValue"] - (sell_quantity * average_cost), 2)
+
+        if bucket["buyQuantity"] <= 0:
+            bucket["buyQuantity"] = 0.0
+            bucket["buyValue"] = 0.0
+    else:
+        bucket["buyQuantity"] += quantity
+        bucket["buyValue"] += quantity * purchase_price
+
+
+def _average_cost_basis(history: list[dict]) -> tuple[float, float]:
+    """
+    Replays a single ticker's transaction history to get its current
+    (quantity, averageCost). Used right before a sell, to compute
+    realized gain against the correct cost basis.
+    """
+
+    bucket = {"buyQuantity": 0.0, "buyValue": 0.0}
+    for row in history:
+        _apply_transaction(bucket, row)
+
+    quantity = round(bucket["buyQuantity"], 4)
+    average_cost = round(bucket["buyValue"] / bucket["buyQuantity"], 2) if bucket["buyQuantity"] else 0.0
+    return quantity, average_cost
+
+
+def _total_realized_gain(rows: list[dict]) -> float:
+    """Sums realized gain across every sell row, regardless of ticker."""
+
+    return round(
+        sum(float(row.get("realizedGain") or 0.0) for row in rows if (row.get("side") or "buy").lower() == "sell"),
+        2,
+    )
+
+
 def _build_holdings_snapshot(rows: list[dict]) -> list[dict]:
     """
     Aggregates raw buy/sell transactions into one net position per
-    ticker, using average cost basis. A position that's fully closed
-    (net quantity reaches zero) resets its cost basis, so a later buy
-    starts fresh instead of blending with the closed lot.
+    ticker, using average cost basis, plus the realized gain booked
+    from any past sells of that ticker.
     """
 
-    grouped = defaultdict(lambda: {"buyQuantity": 0.0, "buyValue": 0.0})
+    grouped = defaultdict(lambda: {"buyQuantity": 0.0, "buyValue": 0.0, "realizedGain": 0.0})
 
     for row in rows:
         ticker = normalize_ticker(row["ticker"])
-        side = (row.get("side") or "buy").lower()
-        quantity = float(row["quantity"])
-        purchase_price = float(row["purchasePrice"])
-
         bucket = grouped[ticker]
-        if side == "sell":
-            if bucket["buyQuantity"] <= 0:
-                continue
 
-            sell_quantity = min(quantity, bucket["buyQuantity"])
-            average_cost = bucket["buyValue"] / bucket["buyQuantity"] if bucket["buyQuantity"] else 0.0
-            bucket["buyQuantity"] = round(bucket["buyQuantity"] - sell_quantity, 4)
-            bucket["buyValue"] = round(bucket["buyValue"] - (sell_quantity * average_cost), 2)
+        if (row.get("side") or "buy").lower() == "sell":
+            bucket["realizedGain"] += float(row.get("realizedGain") or 0.0)
 
-            if bucket["buyQuantity"] <= 0:
-                bucket["buyQuantity"] = 0.0
-                bucket["buyValue"] = 0.0
-        else:
-            bucket["buyQuantity"] += quantity
-            bucket["buyValue"] += quantity * purchase_price
+        _apply_transaction(bucket, row)
 
     holdings = []
     for ticker, bucket in grouped.items():
@@ -77,7 +119,12 @@ def _build_holdings_snapshot(rows: list[dict]) -> list[dict]:
             continue
 
         average_price = round(bucket["buyValue"] / bucket["buyQuantity"], 2) if bucket["buyQuantity"] else 0.0
-        holdings.append({"ticker": ticker, "averagePrice": average_price, "quantity": net_quantity})
+        holdings.append({
+            "ticker": ticker,
+            "averagePrice": average_price,
+            "quantity": net_quantity,
+            "realizedGain": round(bucket["realizedGain"], 2),
+        })
 
     holdings.sort(key=lambda item: item["ticker"])
 
@@ -105,9 +152,22 @@ def get_holdings() -> list[dict]:
 
 
 def get_performance() -> dict:
-    """Returns each holding enriched with performance figures, plus a portfolio-wide summary."""
+    """
+    Returns each holding enriched with performance figures, plus a
+    portfolio-wide summary.
 
-    holdings = get_holdings()
+    Distinguishes realized P/L (profit/loss already locked in from
+    past sells) from unrealized P/L (paper gain/loss on what's still
+    held) - totalGain/gainPercent stay unrealized-only for backward
+    compatibility, with unrealizedGain/realizedGain/totalPL added
+    alongside.
+    """
+
+    with persistence.transaction() as cursor:
+        rows = persistence.fetch_all_transactions(cursor)
+
+    holdings = _build_holdings_snapshot(rows)
+    total_realized_gain = _total_realized_gain(rows)
 
     enriched_holdings = []
     for holding in holdings:
@@ -116,7 +176,13 @@ def get_performance() -> dict:
             purchase_price=holding["averagePrice"],
             current_price=holding["currentPrice"],
         )
-        enriched_holdings.append({**holding, "purchasePrice": holding["averagePrice"], **performance})
+        enriched_holdings.append({
+            **holding,
+            "purchasePrice": holding["averagePrice"],
+            **performance,
+            "unrealizedGain": performance["totalGain"],
+            "totalPL": round(performance["totalGain"] + holding["realizedGain"], 2),
+        })
 
     summary = calculate_portfolio_performance(
         [
@@ -128,6 +194,9 @@ def get_performance() -> dict:
             for holding in holdings
         ]
     )
+    summary["totalRealizedGain"] = total_realized_gain
+    summary["totalUnrealizedGain"] = summary["totalGain"]
+    summary["totalPL"] = round(summary["totalGain"] + total_realized_gain, 2)
 
     return {"holdings": enriched_holdings, "summary": summary}
 
@@ -197,8 +266,9 @@ def buy_holding(ticker: str, asset_type: str, quantity: float, purchase_price: f
 def sell_holding(ticker: str, quantity: float) -> dict:
     """
     Sells shares of an existing holding at the live market price,
-    crediting the cash balance. Rejects sales exceeding the shares
-    actually owned.
+    crediting the cash balance and booking the realized gain/loss for
+    this sale (sale price minus the average cost basis at the time of
+    sale). Rejects sales exceeding the shares actually owned.
     """
 
     clean_ticker = normalize_ticker(ticker)
@@ -209,7 +279,9 @@ def sell_holding(ticker: str, quantity: float) -> dict:
         )
 
     with persistence.transaction() as cursor:
-        owned_quantity = persistence.fetch_net_quantity(cursor, clean_ticker)
+        history = persistence.fetch_ticker_history(cursor, clean_ticker)
+        owned_quantity, average_cost = _average_cost_basis(history)
+
         if quantity > owned_quantity:
             raise InsufficientSharesError(
                 f"Insufficient shares: you only own {owned_quantity:.4f} shares of {clean_ticker}."
@@ -220,8 +292,9 @@ def sell_holding(ticker: str, quantity: float) -> dict:
             raise NoTransactionsFoundError(f"No buy transactions found for {clean_ticker}.")
 
         sale_value = round(float(quantity) * float(current_price), 2)
+        realized_gain = round((float(current_price) - average_cost) * float(quantity), 2)
         sold_date = date.today().isoformat()
-        persistence.insert_sell(cursor, clean_ticker, asset_type, quantity, current_price, sold_date)
+        persistence.insert_sell(cursor, clean_ticker, asset_type, quantity, current_price, sold_date, realized_gain)
 
         current_balance = _require_balance(cursor)
         new_balance = round(current_balance + sale_value, 2)
@@ -230,6 +303,7 @@ def sell_holding(ticker: str, quantity: float) -> dict:
     return {
         "message": f"Sold {quantity} shares of {clean_ticker}",
         "soldValue": sale_value,
+        "realizedGain": realized_gain,
         "remainingBalance": new_balance,
     }
 

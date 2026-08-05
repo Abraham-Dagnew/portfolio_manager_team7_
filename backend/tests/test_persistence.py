@@ -43,13 +43,15 @@ class PersistenceTests(unittest.TestCase):
         self.assertIn("ORDER BY purchaseDate ASC, id ASC", sql)
         self.assertEqual(result, [{"id": 1}])
 
-    def test_fetch_net_quantity_defaults_to_zero_when_no_rows(self):
-        cursor = FakeCursor(fetchone_result={"quantity": None})
+    def test_fetch_ticker_history_orders_by_date_then_id(self):
+        cursor = FakeCursor(fetchall_result=[{"side": "buy", "quantity": 10, "purchasePrice": 100.0}])
 
-        result = persistence.fetch_net_quantity(cursor, "AAPL")
+        result = persistence.fetch_ticker_history(cursor, "AAPL")
 
-        self.assertEqual(result, 0.0)
-        self.assertEqual(cursor.executed[0][1], ("AAPL",))
+        sql, params = cursor.executed[0]
+        self.assertIn("ORDER BY purchaseDate ASC, id ASC", sql)
+        self.assertEqual(params, ("AAPL",))
+        self.assertEqual(result, [{"side": "buy", "quantity": 10, "purchasePrice": 100.0}])
 
     def test_fetch_latest_buy_type_returns_none_when_missing(self):
         cursor = FakeCursor(fetchone_result=None)
@@ -76,12 +78,12 @@ class PersistenceTests(unittest.TestCase):
     def test_insert_sell_returns_new_id(self):
         cursor = FakeCursor(lastrowid=43)
 
-        new_id = persistence.insert_sell(cursor, "AAPL", "stock", 5, 200.0, "2026-02-01")
+        new_id = persistence.insert_sell(cursor, "AAPL", "stock", 5, 200.0, "2026-02-01", 500.0)
 
         self.assertEqual(new_id, 43)
         sql, params = cursor.executed[0]
         self.assertIn("'sell'", sql)
-        self.assertEqual(params, ("AAPL", "stock", 5, 200.0, "2026-02-01"))
+        self.assertEqual(params, ("AAPL", "stock", 5, 200.0, "2026-02-01", 500.0))
 
     def test_fetch_idempotent_response_returns_none_when_missing(self):
         cursor = FakeCursor(fetchone_result=None)
