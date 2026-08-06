@@ -66,31 +66,56 @@ class PortfolioPerformanceTests(unittest.TestCase):
 
     @patch("services.calculate_portfolio_performance")
     @patch("services.calculate_holding_performance")
-    @patch("services.get_holdings")
+    @patch("services._total_realized_gain")
+    @patch("services._build_holdings_snapshot")
+    @patch("services.persistence.fetch_all_transactions")
+    @patch("services.persistence.transaction")
     def test_portfolio_performance_under_200ms(
         self,
-        mock_holdings,
+        mock_transaction,
+        mock_fetch_transactions,
+        mock_snapshot,
+        mock_total_realized,
         mock_holding_perf,
         mock_portfolio_perf,
     ):
 
-        mock_holdings.return_value = [
+        mock_cursor = object()
+
+        class DummyTransaction:
+            def __enter__(self):
+                return mock_cursor
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        mock_transaction.return_value = DummyTransaction()
+        mock_fetch_transactions.return_value = []
+
+        mock_snapshot.return_value = [
             {
                 "ticker": "AAPL",
                 "quantity": 10,
                 "averagePrice": 150,
+                "realizedGain": 0.0,
                 "currentPrice": 200,
             }
         ] * 500
 
+        mock_total_realized.return_value = 0.0
+
         mock_holding_perf.return_value = {
-            "gainLoss": 500,
-            "gainLossPercent": 33.3,
+            "totalValue": 2000.0,
+            "totalCost": 1500.0,
+            "totalGain": 500.0,
+            "gainPercent": 33.3,
         }
 
         mock_portfolio_perf.return_value = {
-            "totalGainLoss": 5000,
-            "totalGainLossPercent": 20,
+            "totalValue": 1000000.0,
+            "totalCost": 750000.0,
+            "totalGain": 250000.0,
+            "gainPercent": 33.3,
         }
 
         start = time.perf_counter()

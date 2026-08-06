@@ -44,7 +44,8 @@ def create_table():
             side ENUM('buy', 'sell') NOT NULL DEFAULT 'buy',
             quantity DECIMAL(10,4) NOT NULL,
             purchasePrice DECIMAL(10,2) NOT NULL,
-            purchaseDate DATE NOT NULL
+            purchaseDate DATE NOT NULL,
+            realizedGain DECIMAL(12,2) NULL DEFAULT NULL
         )
     """)
 
@@ -76,6 +77,14 @@ def update_existing_table():
             ALTER TABLE portfolio
             ADD COLUMN side ENUM('buy', 'sell') NOT NULL DEFAULT 'buy'
             AFTER purchaseDate
+        """)
+
+    cursor.execute("SHOW COLUMNS FROM portfolio LIKE 'realizedGain'")
+    if cursor.fetchone() is None:
+        cursor.execute("""
+            ALTER TABLE portfolio
+            ADD COLUMN realizedGain DECIMAL(12,2) NULL DEFAULT NULL
+            AFTER side
         """)
 
     conn.commit()

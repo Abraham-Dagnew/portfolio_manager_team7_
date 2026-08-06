@@ -40,17 +40,23 @@ def fetch_all_transactions(cursor) -> list[dict]:
     return cursor.fetchall()
 
 
-def fetch_net_quantity(cursor, ticker: str) -> float:
+def fetch_ticker_history(cursor, ticker: str) -> list[dict]:
+    """
+    Returns every buy/sell row for a single ticker, in chronological
+    order. Used to compute the average cost basis at the moment of a
+    sale, so realized gain can be calculated correctly.
+    """
+
     cursor.execute(
         """
-        SELECT COALESCE(SUM(CASE WHEN side = 'buy' THEN quantity ELSE -quantity END), 0) AS quantity
+        SELECT side, quantity, purchasePrice
         FROM portfolio
         WHERE ticker = %s
+        ORDER BY purchaseDate ASC, id ASC
     """,
         (ticker,),
     )
-    row = cursor.fetchone()
-    return float(row["quantity"] if row and row["quantity"] is not None else 0.0)
+    return cursor.fetchall()
 
 
 def fetch_latest_buy_type(cursor, ticker: str) -> str | None:
@@ -89,13 +95,15 @@ def insert_buy(cursor, ticker: str, asset_type: str, quantity: float, purchase_p
     return cursor.lastrowid
 
 
-def insert_sell(cursor, ticker: str, asset_type: str, quantity: float, price: float, sold_date: str) -> int:
+def insert_sell(
+    cursor, ticker: str, asset_type: str, quantity: float, price: float, sold_date: str, realized_gain: float
+) -> int:
     cursor.execute(
         """
-        INSERT INTO portfolio (ticker, type, side, quantity, purchasePrice, purchaseDate)
-        VALUES (%s, %s, 'sell', %s, %s, %s)
+        INSERT INTO portfolio (ticker, type, side, quantity, purchasePrice, purchaseDate, realizedGain)
+        VALUES (%s, %s, 'sell', %s, %s, %s, %s)
     """,
-        (ticker, asset_type, quantity, price, sold_date),
+        (ticker, asset_type, quantity, price, sold_date, realized_gain),
     )
     return cursor.lastrowid
 
