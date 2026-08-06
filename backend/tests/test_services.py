@@ -82,8 +82,8 @@ class TransactionsAndHoldingsTests(unittest.TestCase):
         self.assertEqual(
             result,
             [
-                {"ticker": "AAPL", "averagePrice": 106.67, "quantity": 12.0, "realizedGain": 0.0, "currentPrice": 150.0},
-                {"ticker": "MSFT", "averagePrice": 200.0, "quantity": 2.0, "realizedGain": 0.0, "currentPrice": 250.0},
+                {"ticker": "AAPL", "averagePrice": 106.67, "quantity": 12.0, "realizedGain": 0.0, "type": None, "currentPrice": 150.0},
+                {"ticker": "MSFT", "averagePrice": 200.0, "quantity": 2.0, "realizedGain": 0.0, "type": None, "currentPrice": 250.0},
             ],
         )
 
@@ -103,7 +103,7 @@ class TransactionsAndHoldingsTests(unittest.TestCase):
 
         self.assertEqual(
             result,
-            [{"ticker": "INTC", "averagePrice": 90.71, "quantity": 4.0, "realizedGain": 0.0, "currentPrice": 92.0}],
+            [{"ticker": "INTC", "averagePrice": 90.71, "quantity": 4.0, "realizedGain": 0.0, "type": None, "currentPrice": 92.0}],
         )
 
     def test_get_holdings_carries_realized_gain_from_past_sells(self):
@@ -121,7 +121,7 @@ class TransactionsAndHoldingsTests(unittest.TestCase):
 
         self.assertEqual(
             result,
-            [{"ticker": "AAPL", "averagePrice": 100.0, "quantity": 6.0, "realizedGain": 80.0, "currentPrice": 130.0}],
+            [{"ticker": "AAPL", "averagePrice": 100.0, "quantity": 6.0, "realizedGain": 80.0, "type": None, "currentPrice": 130.0}],
         )
 
     def test_get_performance_returns_holdings_and_summary(self):

@@ -54,7 +54,13 @@
             <canvas id="gain-loss-chart"></canvas>
         </div>
         <div class="chart-card">
-            <h2>Asset Allocation</h2>
+            <div class="chart-card-header">
+                <h2 id="allocation-chart-title">Asset Allocation</h2>
+                <div class="allocation-toggle" role="group" aria-label="Allocation breakdown">
+                    <button type="button" id="allocation-toggle-asset" class="tab-button active">By Asset</button>
+                    <button type="button" id="allocation-toggle-type" class="tab-button">By Type</button>
+                </div>
+            </div>
             <canvas id="allocation-chart"></canvas>
         </div>
     </section>

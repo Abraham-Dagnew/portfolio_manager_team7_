@@ -101,11 +101,14 @@ def _build_holdings_snapshot(rows: list[dict]) -> list[dict]:
     from any past sells of that ticker.
     """
 
-    grouped = defaultdict(lambda: {"buyQuantity": 0.0, "buyValue": 0.0, "realizedGain": 0.0})
+    grouped = defaultdict(lambda: {"buyQuantity": 0.0, "buyValue": 0.0, "realizedGain": 0.0, "type": None})
 
     for row in rows:
         ticker = normalize_ticker(row["ticker"])
         bucket = grouped[ticker]
+
+        if row.get("type"):
+            bucket["type"] = row["type"]
 
         if (row.get("side") or "buy").lower() == "sell":
             bucket["realizedGain"] += float(row.get("realizedGain") or 0.0)
@@ -124,6 +127,7 @@ def _build_holdings_snapshot(rows: list[dict]) -> list[dict]:
             "averagePrice": average_price,
             "quantity": net_quantity,
             "realizedGain": round(bucket["realizedGain"], 2),
+            "type": bucket["type"],
         })
 
     holdings.sort(key=lambda item: item["ticker"])
