@@ -1132,6 +1132,24 @@ label[for="purchaseDate"] {
     margin-top:0;
 }
 
+.chart-card-header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:.75rem;
+    flex-wrap:wrap;
+}
+
+.allocation-toggle {
+    display:flex;
+    gap:.5rem;
+}
+
+.allocation-toggle .tab-button {
+    padding:.4rem .8rem;
+    font-size:.85rem;
+}
+
 
 .holdings-table {
     width:100%;

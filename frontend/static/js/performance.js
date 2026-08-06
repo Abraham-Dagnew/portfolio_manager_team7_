@@ -8,8 +8,16 @@ const contentEl = document.getElementById("performance-content");
 const tableBodyEl = document.getElementById("holdings-table-body");
 const lastUpdatedEl = document.getElementById("last-updated");
 const analyticsGridEl = document.getElementById("analytics-grid");
+const allocationChartTitleEl = document.getElementById("allocation-chart-title");
+const allocationToggleAssetEl = document.getElementById("allocation-toggle-asset");
+const allocationToggleTypeEl = document.getElementById("allocation-toggle-type");
 
 const ALLOCATION_COLORS = ["#012B51", "#0E4C7A", "#1C74A8", "#4A9BC7", "#8FC1DE", "#052647", "#B0C1D1"];
+const TYPE_LABELS = { stock: "Stocks", etf: "ETFs", bond: "Bonds", cash: "Cash" };
+
+let currentHoldings = [];
+let allocationChart = null;
+let allocationView = "asset";
 
 function formatPercent(value) {
     return `${Number(value).toFixed(2)}%`;
@@ -86,17 +94,42 @@ function renderGainLossChart(holdings) {
     });
 }
 
+function groupHoldingsByType(holdings) {
+    const totals = new Map();
+
+    for (const holding of holdings) {
+        const key = holding.type || "other";
+        totals.set(key, (totals.get(key) || 0) + holding.totalValue);
+    }
+
+    return {
+        labels: [...totals.keys()].map((key) => TYPE_LABELS[key] || key),
+        values: [...totals.values()],
+    };
+}
+
 function renderAllocationChart(holdings) {
     const ctx = document.getElementById("allocation-chart");
 
-    new Chart(ctx, {
+    const { labels, values } =
+        allocationView === "type"
+            ? groupHoldingsByType(holdings)
+            : { labels: holdings.map((holding) => holding.ticker), values: holdings.map((holding) => holding.totalValue) };
+
+    allocationChartTitleEl.textContent = allocationView === "type" ? "Allocation by Type" : "Asset Allocation";
+
+    if (allocationChart) {
+        allocationChart.destroy();
+    }
+
+    allocationChart = new Chart(ctx, {
         type: "doughnut",
         data: {
-            labels: holdings.map((holding) => holding.ticker),
+            labels,
             datasets: [
                 {
-                    data: holdings.map((holding) => holding.totalValue),
-                    backgroundColor: holdings.map((_, index) => ALLOCATION_COLORS[index % ALLOCATION_COLORS.length]),
+                    data: values,
+                    backgroundColor: labels.map((_, index) => ALLOCATION_COLORS[index % ALLOCATION_COLORS.length]),
                 },
             ],
         },
@@ -108,6 +141,19 @@ function renderAllocationChart(holdings) {
         },
     });
 }
+
+function setAllocationView(view) {
+    allocationView = view;
+    allocationToggleAssetEl.classList.toggle("active", view === "asset");
+    allocationToggleTypeEl.classList.toggle("active", view === "type");
+
+    if (currentHoldings.length > 0) {
+        renderAllocationChart(currentHoldings);
+    }
+}
+
+allocationToggleAssetEl.addEventListener("click", () => setAllocationView("asset"));
+allocationToggleTypeEl.addEventListener("click", () => setAllocationView("type"));
 
 async function loadPerformance() {
     try {
@@ -128,6 +174,8 @@ async function loadPerformance() {
         renderLastUpdated();
         renderSummary(data.summary);
         renderTable(data.holdings);
+
+        currentHoldings = data.holdings;
 
         analyticsGridEl.classList.toggle("hidden", !hasHoldings);
         if (hasHoldings) {
