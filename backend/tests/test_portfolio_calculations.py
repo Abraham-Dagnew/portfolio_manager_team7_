@@ -1,8 +1,7 @@
 import os
 import sys
+import unittest
 from unittest.mock import patch
-
-import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
@@ -14,245 +13,221 @@ import services
 TICKER = "TEST"
 
 
-class DummyTransaction:
-    def __enter__(self):
-        return None
+class PortfolioCalculationTests(unittest.TestCase):
 
-    def __exit__(self, exc_type, exc, tb):
-        return False
-
-
-def get_result(transactions, price):
-    with patch(
-        "services.persistence.transaction",
-        return_value=DummyTransaction()
-    ), patch(
-        "services.persistence.fetch_all_transactions",
-        return_value=transactions
-    ), patch(
-        "services.get_multiple_prices",
-        return_value={TICKER: price}
-    ):
-        return services.get_performance()["holdings"][0]
+    def get_performance(self, transactions, price):
+        with patch(
+            "services.persistence.fetch_all_transactions",
+            return_value=transactions
+        ), patch(
+            "services.get_multiple_prices",
+            return_value={TICKER: price}
+        ):
+            return services.get_performance()["holdings"][0]
 
 
-def print_calculation(price, action, holding):
-    print("\n--------------------------------")
-    print(f"Current Price: ${price}")
-    print(f"Action: {action}")
-    print(f"Shares: {holding['quantity']}")
-    print(f"Average Cost/Share: ${holding['purchasePrice']}")
-    print(f"Realized P/L: ${holding['realizedGain']}")
-    print(f"Unrealized P/L: ${holding['unrealizedGain']}")
-    print(f"Total P/L: ${holding['totalPL']}")
+    def print_table_row(self, price, action, cash, holding):
+        print("\n--------------------------------")
+        print(f"Current Price: ${price}")
+        print(f"Action: {action}")
+        print(f"Cash in hand: ${cash}")
+        print(f"Shares: {holding['quantity']}")
+        print(f"Average cost/share: ${holding['purchasePrice']}")
+        print(f"Realized P/L: ${holding['realizedGain']}")
+        print(f"Unrealized P/L: ${holding['unrealizedGain']}")
+        print(f"Total P/L: ${holding['totalPL']}")
 
 
-@pytest.fixture
-def buy_100():
-    return [
-        {
-            "ticker": TICKER,
-            "side": "buy",
-            "quantity": 100,
-            "purchasePrice": 10,
-            "realizedGain": 0,
-        }
-    ]
+    def test_01_buy_100_at_10(self):
+        transactions = [
+            {
+                "ticker": TICKER,
+                "side": "buy",
+                "quantity": 100,
+                "purchasePrice": 10,
+                "realizedGain": 0
+            }
+        ]
+
+        holding = self.get_performance(transactions, 10)
+
+        self.print_table_row(
+            10,
+            "Buy 100",
+            0,
+            holding
+        )
+
+        self.assertEqual(holding["quantity"], 100)
+        self.assertEqual(holding["purchasePrice"], 10)
+        self.assertEqual(holding["totalPL"], 0)
 
 
-@pytest.fixture
-def after_sell_50():
-    return [
-        {
-            "ticker": TICKER,
-            "side": "buy",
-            "quantity": 100,
-            "purchasePrice": 10,
-            "realizedGain": 0,
-        },
-        {
-            "ticker": TICKER,
-            "side": "sell",
-            "quantity": 50,
-            "purchasePrice": 15,
-            "realizedGain": 250,
-        }
-    ]
+    def test_02_sell_50_at_15(self):
+        transactions = [
+            {"ticker": TICKER, "side": "buy", "quantity": 100, "purchasePrice": 10, "realizedGain": 0},
+            {"ticker": TICKER, "side": "sell", "quantity": 50, "purchasePrice": 15, "realizedGain": 250},
+        ]
+
+        holding = self.get_performance(transactions, 15)
+
+        self.print_table_row(
+            15,
+            "Sell 50",
+            750,
+            holding
+        )
+
+        self.assertEqual(holding["quantity"], 50)
+        self.assertEqual(holding["realizedGain"], 250)
+        self.assertEqual(holding["unrealizedGain"], 250)
+        self.assertEqual(holding["totalPL"], 500)
 
 
-@pytest.fixture
-def after_second_buy():
-    return [
-        {
-            "ticker": TICKER,
-            "side": "buy",
-            "quantity": 100,
-            "purchasePrice": 10,
-            "realizedGain": 0,
-        },
-        {
-            "ticker": TICKER,
-            "side": "sell",
-            "quantity": 50,
-            "purchasePrice": 15,
-            "realizedGain": 250,
-        },
-        {
-            "ticker": TICKER,
-            "side": "buy",
-            "quantity": 10,
-            "purchasePrice": 25,
-            "realizedGain": 0,
-        }
-    ]
+    def test_03_price_check_10(self):
+        transactions = [
+            {"ticker": TICKER, "side": "buy", "quantity": 100, "purchasePrice": 10, "realizedGain": 0},
+            {"ticker": TICKER, "side": "sell", "quantity": 50, "purchasePrice": 15, "realizedGain": 250},
+        ]
+
+        holding = self.get_performance(transactions, 10)
+
+        self.print_table_row(
+            10,
+            "No action",
+            750,
+            holding
+        )
+
+        self.assertEqual(holding["unrealizedGain"], 0)
+        self.assertEqual(holding["totalPL"], 250)
 
 
-@pytest.fixture
-def after_sell_20():
-    return [
-        {
-            "ticker": TICKER,
-            "side": "buy",
-            "quantity": 100,
-            "purchasePrice": 10,
-            "realizedGain": 0,
-        },
-        {
-            "ticker": TICKER,
-            "side": "sell",
-            "quantity": 50,
-            "purchasePrice": 15,
-            "realizedGain": 250,
-        },
-        {
-            "ticker": TICKER,
-            "side": "buy",
-            "quantity": 10,
-            "purchasePrice": 25,
-            "realizedGain": 0,
-        },
-        {
-            "ticker": TICKER,
-            "side": "sell",
-            "quantity": 20,
-            "purchasePrice": 15,
-            "realizedGain": 50,
-        }
-    ]
+    def test_04_price_check_20(self):
+        transactions = [
+            {"ticker": TICKER, "side": "buy", "quantity": 100, "purchasePrice": 10, "realizedGain": 0},
+            {"ticker": TICKER, "side": "sell", "quantity": 50, "purchasePrice": 15, "realizedGain": 250},
+        ]
+
+        holding = self.get_performance(transactions, 20)
+
+        self.print_table_row(
+            20,
+            "No action",
+            750,
+            holding
+        )
+
+        self.assertEqual(holding["unrealizedGain"], 500)
+        self.assertEqual(holding["totalPL"], 750)
 
 
-def test_buy_100_at_10(buy_100):
+    def test_05_buy_10_at_25(self):
+        transactions = [
+            {"ticker": TICKER, "side": "buy", "quantity": 100, "purchasePrice": 10, "realizedGain": 0},
+            {"ticker": TICKER, "side": "sell", "quantity": 50, "purchasePrice": 15, "realizedGain": 250},
+            {"ticker": TICKER, "side": "buy", "quantity": 10, "purchasePrice": 25, "realizedGain": 0},
+        ]
 
-    holding = get_result(buy_100, 10)
+        holding = self.get_performance(transactions, 25)
 
-    print_calculation(10, "Buy 100", holding)
+        self.print_table_row(
+            25,
+            "Buy 10",
+            500,
+            holding
+        )
 
-    assert holding["quantity"] == 100
-    assert holding["purchasePrice"] == 10
-    assert holding["realizedGain"] == 0
-    assert holding["unrealizedGain"] == 0
-    assert holding["totalPL"] == 0
-
-
-def test_sell_50_at_15(after_sell_50):
-
-    holding = get_result(after_sell_50, 15)
-
-    print_calculation(15, "Sell 50", holding)
-
-    assert holding["quantity"] == 50
-    assert holding["purchasePrice"] == 10
-    assert holding["realizedGain"] == 250
-    assert holding["unrealizedGain"] == 250
-    assert holding["totalPL"] == 500
+        self.assertEqual(holding["quantity"], 60)
+        self.assertEqual(holding["purchasePrice"], 12.5)
+        self.assertEqual(holding["totalPL"], 1000)
 
 
-def test_price_drop_to_10(after_sell_50):
+    def test_06_price_check_15(self):
+        transactions = [
+            {"ticker": TICKER, "side": "buy", "quantity": 100, "purchasePrice": 10, "realizedGain": 0},
+            {"ticker": TICKER, "side": "sell", "quantity": 50, "purchasePrice": 15, "realizedGain": 250},
+            {"ticker": TICKER, "side": "buy", "quantity": 10, "purchasePrice": 25, "realizedGain": 0},
+        ]
 
-    holding = get_result(after_sell_50, 10)
+        holding = self.get_performance(transactions, 15)
 
-    print_calculation(10, "No Action", holding)
+        self.print_table_row(
+            15,
+            "No action",
+            500,
+            holding
+        )
 
-    assert holding["unrealizedGain"] == 0
-    assert holding["totalPL"] == 250
-
-
-def test_price_increase_to_20(after_sell_50):
-
-    holding = get_result(after_sell_50, 20)
-
-    print_calculation(20, "No Action", holding)
-
-    assert holding["unrealizedGain"] == 500
-    assert holding["totalPL"] == 750
-
-
-def test_buy_10_at_25(after_second_buy):
-
-    holding = get_result(after_second_buy, 25)
-
-    print_calculation(25, "Buy 10", holding)
-
-    assert holding["quantity"] == 60
-    assert holding["purchasePrice"] == 12.5
-    assert holding["realizedGain"] == 250
-    assert holding["unrealizedGain"] == 750
-    assert holding["totalPL"] == 1000
+        self.assertEqual(holding["unrealizedGain"], 150)
+        self.assertEqual(holding["totalPL"], 400)
 
 
-def test_price_drop_to_15(after_second_buy):
+    def test_07_price_check_20_again(self):
+        transactions = [
+            {"ticker": TICKER, "side": "buy", "quantity": 100, "purchasePrice": 10, "realizedGain": 0},
+            {"ticker": TICKER, "side": "sell", "quantity": 50, "purchasePrice": 15, "realizedGain": 250},
+            {"ticker": TICKER, "side": "buy", "quantity": 10, "purchasePrice": 25, "realizedGain": 0},
+        ]
 
-    holding = get_result(after_second_buy, 15)
+        holding = self.get_performance(transactions, 20)
 
-    print_calculation(15, "No Action", holding)
+        self.print_table_row(
+            20,
+            "No action",
+            500,
+            holding
+        )
 
-    assert holding["unrealizedGain"] == 150
-    assert holding["totalPL"] == 400
-
-
-def test_price_increase_to_20_again(after_second_buy):
-
-    holding = get_result(after_second_buy, 20)
-
-    print_calculation(20, "No Action", holding)
-
-    assert holding["unrealizedGain"] == 450
-    assert holding["totalPL"] == 700
-
-
-def test_sell_20_at_15(after_sell_20):
-
-    holding = get_result(after_sell_20, 15)
-
-    print_calculation(15, "Sell 20", holding)
-
-    assert holding["quantity"] == 40
-    assert holding["purchasePrice"] == 12.5
-    assert holding["realizedGain"] == 300
-    assert holding["unrealizedGain"] == 100
-    assert holding["totalPL"] == 400
+        self.assertEqual(holding["unrealizedGain"], 450)
+        self.assertEqual(holding["totalPL"], 700)
 
 
-def test_final_price_at_30(after_sell_20):
+    def test_08_sell_20_at_15(self):
+        transactions = [
+            {"ticker": TICKER, "side": "buy", "quantity": 100, "purchasePrice": 10, "realizedGain": 0},
+            {"ticker": TICKER, "side": "sell", "quantity": 50, "purchasePrice": 15, "realizedGain": 250},
+            {"ticker": TICKER, "side": "buy", "quantity": 10, "purchasePrice": 25, "realizedGain": 0},
+            {"ticker": TICKER, "side": "sell", "quantity": 20, "purchasePrice": 15, "realizedGain": 50},
+        ]
 
-    holding = get_result(after_sell_20, 30)
+        holding = self.get_performance(transactions, 15)
 
-    print_calculation(30, "No Action", holding)
+        self.print_table_row(
+            15,
+            "Sell 20",
+            800,
+            holding
+        )
 
-    assert holding["quantity"] == 40
-    assert holding["realizedGain"] == 300
-    assert holding["unrealizedGain"] == 700
-    assert holding["totalPL"] == 1000
+        self.assertEqual(holding["quantity"], 40)
+        self.assertEqual(holding["realizedGain"], 300)
+        self.assertEqual(holding["unrealizedGain"], 100)
+        self.assertEqual(holding["totalPL"], 400)
 
 
-def test_final_portfolio_summary(after_sell_20):
+    def test_09_final_price_30(self):
+        transactions = [
+            {"ticker": TICKER, "side": "buy", "quantity": 100, "purchasePrice": 10, "realizedGain": 0},
+            {"ticker": TICKER, "side": "sell", "quantity": 50, "purchasePrice": 15, "realizedGain": 250},
+            {"ticker": TICKER, "side": "buy", "quantity": 10, "purchasePrice": 25, "realizedGain": 0},
+            {"ticker": TICKER, "side": "sell", "quantity": 20, "purchasePrice": 15, "realizedGain": 50},
+        ]
 
-    holding = get_result(after_sell_20, 30)
+        holding = self.get_performance(transactions, 30)
 
-    print("\n--------------------------------")
-    print("Final Portfolio Summary")
-    print(f"Realized P/L: ${holding['realizedGain']}")
-    print(f"Unrealized P/L: ${holding['unrealizedGain']}")
-    print(f"Total P/L: ${holding['totalPL']}")
+        self.print_table_row(
+            30,
+            "No action",
+            800,
+            holding
+        )
 
-    assert holding["totalPL"] == 1000
+        self.assertEqual(holding["quantity"], 40)
+        self.assertEqual(holding["realizedGain"], 300)
+        self.assertEqual(holding["unrealizedGain"], 700)
+        self.assertEqual(holding["totalPL"], 1000)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
